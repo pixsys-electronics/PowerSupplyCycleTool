@@ -321,6 +321,8 @@ class RigolTestApp(tk.Tk):
         self.ip_addresses.update(data)
         for entry in data:
             self.log(f"[INFO] IP found: {entry}")
+        
+        self.refresh_address_table()
 
     def apply_ip_range(self):
         """
@@ -338,15 +340,22 @@ class RigolTestApp(tk.Tk):
             self.log("[ERRORE] IP Start deve essere <= IP End.")
             return
         
-        # Pulisce la Treeview
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        
         # Ricrea la lista degli IP
         self.ip_addresses.clear()
         for ip_int in range(int(start_addr), int(end_addr) + 1):
             addr = ip_address(ip_int)
             self.ip_addresses.add(addr)
+        
+        self.refresh_address_table()
+
+        self.log(f"[INFO] Impostato IP Alimentatore: {self.dp832_host}")
+        self.log(f"[INFO] Range IP: {str(start_addr)} -> {str(end_addr)} (tot: {len(self.ip_addresses)})")
+        self.log(f"[INFO] URL di verifica impostato a: {self.verification_suffix}")
+    
+    def refresh_address_table(self):
+        # Pulisce la Treeview
+        for item in self.tree.get_children():
+            self.tree.delete(item)
         
         # Resetta i tempi di rilevamento
         self.detection_times.clear()
@@ -357,10 +366,6 @@ class RigolTestApp(tk.Tk):
         
         rows_to_show = min(len(self.ip_addresses), 30)
         self.tree.config(height=rows_to_show)
-
-        self.log(f"[INFO] Impostato IP Alimentatore: {self.dp832_host}")
-        self.log(f"[INFO] Range IP: {str(start_addr)} -> {str(end_addr)} (tot: {len(self.ip_addresses)})")
-        self.log(f"[INFO] URL di verifica impostato a: {self.verification_suffix}")
 
     def apply_time_settings(self):
         """
