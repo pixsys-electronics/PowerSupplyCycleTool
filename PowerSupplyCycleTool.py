@@ -20,11 +20,13 @@ class TestBenchConnectionConfig:
     psu_address: IPv4Address
     start_address: IPv4Address
     end_address: IPv4Address
+    url: str
 
-    def __init__(self, psu_address: IPv4Address, start_address: IPv4Address, end_address: IPv4Address):
+    def __init__(self, psu_address: IPv4Address, start_address: IPv4Address, end_address: IPv4Address, url: str):
         self.psu_address = psu_address
         self.start_address = start_address
-        self.end_address = end_address    
+        self.end_address = end_address
+        self.url = url
 
 class TestBenchTimingConfig:
     pre_check_delay: float
@@ -55,7 +57,8 @@ class TestBenchConfig:
         psu_address = ip_address(connection["psu_address"])
         start_address = ip_address(connection["start_address"])
         end_address = ip_address(connection["end_address"])
-        connection = TestBenchConnectionConfig(psu_address, start_address, end_address)
+        url = connection["url"]
+        connection = TestBenchConnectionConfig(psu_address, start_address, end_address, url)
 
         timing = data["timing"]
         pre_check_delay = float(timing["pre_check_delay"])
@@ -67,9 +70,6 @@ class TestBenchConfig:
 
         return TestBenchConfig(connection, timing)
 
-
-# Define di configurazione facilmente modificabile
-DEFAULT_VERIFICATION_SUFFIX = ":9443"
 
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
@@ -95,7 +95,7 @@ class RigolTestApp(tk.Tk):
         self.config: TestBenchConfig = config
         
         # Stringa di verifica configurabile (viene impostata tramite GUI)
-        self.verification_suffix = DEFAULT_VERIFICATION_SUFFIX
+        self.verification_suffix = self.config.connection.url
         
         # Lista IP e tempi di rilevamento
         self.ip_addresses: list[IPv4Address] = []
@@ -167,8 +167,7 @@ class RigolTestApp(tk.Tk):
         # Riga 1: Campo per l'URL di verifica
         ttk.Label(range_frame, text="URL di verifica:").grid(row=1, column=0, padx=5, pady=5)
         self.verification_suffix_entry = ttk.Entry(range_frame, width=20)
-        # Il valore predefinito è impostato dalla costante DEFAULT_VERIFICATION_SUFFIX
-        self.verification_suffix_entry.insert(0, DEFAULT_VERIFICATION_SUFFIX)
+        self.verification_suffix_entry.insert(0, self.config.connection.url)
         self.verification_suffix_entry.grid(row=1, column=1, padx=5, pady=5, columnspan=2, sticky="w")
 
         # Riga 2: Pulsante per applicare il range e la configurazione
@@ -333,7 +332,7 @@ class RigolTestApp(tk.Tk):
         # Aggiorna la stringa di verifica dall'apposito campo
         self.verification_suffix = self.verification_suffix_entry.get().strip()
         if not self.verification_suffix:
-            self.verification_suffix = DEFAULT_VERIFICATION_SUFFIX
+            self.verification_suffix = self.config.connection.url
 
         if start_addr > end_addr:
             self.log("[ERRORE] IP Start deve essere <= IP End.")
