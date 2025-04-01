@@ -118,7 +118,7 @@ class RigolTestApp(tk.Tk):
         self.verification_suffix = DEFAULT_VERIFICATION_SUFFIX
         
         # Lista IP e tempi di rilevamento
-        self.ip_addresses = []
+        self.ip_addresses: list[IPv4Address] = []
         self.detection_times = {}
         
         # Code per log e comunicazioni verso la GUI
@@ -339,11 +339,13 @@ class RigolTestApp(tk.Tk):
             self.log(f"[DEBUG] IP {ip} verifica fallita: {e}")
             return False
     
+    # FIXME path must be taken from an external var
     def retrieve_ip_list_from_config(self):
         filepath = sys.argv[1]
         filepath = os.path.join(os.getcwd(), filepath)
         data = data_from_csv(filepath)
         for entry in data:
+            entry = ip_address(entry)
             self.ip_addresses.append(entry)
             self.log(f"[INFO] IP found: {entry}")
 
@@ -352,21 +354,14 @@ class RigolTestApp(tk.Tk):
         Applica il range IP e la configurazione dell'URL di verifica inseriti dall'utente.
         """
         self.dp832_host = self.dp832_entry.get().strip()
-        start_str = self.start_ip_entry.get().strip()
-        end_str   = self.end_ip_entry.get().strip()
+        start_addr = ip_address(self.start_ip_entry.get().strip())
+        end_addr = ip_address(self.end_ip_entry.get().strip())
         # Aggiorna la stringa di verifica dall'apposito campo
         self.verification_suffix = self.verification_suffix_entry.get().strip()
         if not self.verification_suffix:
             self.verification_suffix = DEFAULT_VERIFICATION_SUFFIX
 
-        try:
-            start_val = ip_to_int(start_str)
-            end_val   = ip_to_int(end_str)
-        except ValueError as ve:
-            self.log(f"[ERRORE] {ve}")
-            return
-        
-        if start_val > end_val:
+        if start_addr > end_addr:
             self.log("[ERRORE] IP Start deve essere <= IP End.")
             return
         
@@ -376,21 +371,22 @@ class RigolTestApp(tk.Tk):
         
         # Ricrea la lista degli IP
         self.ip_addresses = []
-        for ip_int in range(start_val, end_val + 1):
-            ip_str = int_to_ip(ip_int)
-            self.ip_addresses.append(ip_str)
+        for ip_int in range(int(start_addr), int(end_addr) + 1):
+            addr = ip_address(ip_int)
+            self.ip_addresses.append(addr)
         
         # Resetta i tempi di rilevamento
         self.detection_times.clear()
         for ip in self.ip_addresses:
-            self.detection_times[ip] = None
-            self.tree.insert("", tk.END, iid=ip, values=(ip, ""), tags=('normal',))
+            ip_str = str(ip)
+            self.detection_times[ip_str] = None
+            self.tree.insert("", tk.END, iid=ip_str, values=(ip_str, ""), tags=('normal',))
         
         rows_to_show = min(len(self.ip_addresses), 30)
         self.tree.config(height=rows_to_show)
 
         self.log(f"[INFO] Impostato IP Alimentatore: {self.dp832_host}")
-        self.log(f"[INFO] Range IP: {start_str} -> {end_str} (tot: {len(self.ip_addresses)})")
+        self.log(f"[INFO] Range IP: {str(start_addr)} -> {str(end_addr)} (tot: {len(self.ip_addresses)})")
         self.log(f"[INFO] URL di verifica impostato a: {self.verification_suffix}")
 
     def apply_time_settings(self):
@@ -517,9 +513,10 @@ class RigolTestApp(tk.Tk):
                 continue
             
             for ip in self.ip_addresses:
-                self.detection_times[ip] = None
-                self.gui_queue.put(('update_tree', ip, ""))
-                self.gui_queue.put(('remove_tag', ip))
+                ip_str = str(ip)
+                self.detection_times[str(ip_str)] = None
+                self.gui_queue.put(('update_tree', ip_str, ""))
+                self.gui_queue.put(('remove_tag', ip_str))
             
             self.log(f"[INFO] Attendo {self.TEMPO_PRE_CHECK} secondi prima del controllo degli IP.")
             if not self.wait_with_stop_check(self.TEMPO_PRE_CHECK):
