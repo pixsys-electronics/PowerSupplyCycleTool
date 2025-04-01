@@ -1,0 +1,7 @@
+wheel
+setuptools
+requests
+urllib3
+pyvisa
+netifaces
+netaddr
