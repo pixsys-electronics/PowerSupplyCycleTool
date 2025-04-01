@@ -80,11 +80,12 @@ def config_from_json(file_path: str):
         data = json.load(file)
     return data
 
-def data_from_csv(file_path: str):
-    data: list[dict] = []
+def data_from_csv(file_path: str) -> set[IPv4Address]:
+    data: set[IPv4Address] = set()
     with open(file_path, mode='r') as file:
         csv_reader = csv.DictReader(file, delimiter=';')
-        data = [row['address'] for row in csv_reader]
+        addresses = [ip_address(row['address']) for row in csv_reader]
+        data.update(addresses)
     return data
 
 class RigolTestApp(tk.Tk):
@@ -98,7 +99,7 @@ class RigolTestApp(tk.Tk):
         self.verification_suffix = self.config.connection.url
         
         # Lista IP e tempi di rilevamento
-        self.ip_addresses: list[IPv4Address] = []
+        self.ip_addresses: set[IPv4Address] = set()
         self.detection_times = {}
         
         # Code per log e comunicazioni verso la GUI
@@ -293,7 +294,7 @@ class RigolTestApp(tk.Tk):
             self.log(f"[DEBUG] IP {ip} non risponde: {e}")
             return False
 
-    def ip_responds_curl(self, ip):
+    def ip_responds_curl(self, ip: IPv4Address):
         """Verifica se l'IP risponde utilizzando curl e la stringa di verifica configurata."""
         protocol = "http" if self.verification_suffix.startswith(":80") else "https"
         url = f"{protocol}://{ip}{self.verification_suffix}"
@@ -317,9 +318,8 @@ class RigolTestApp(tk.Tk):
         filepath = sys.argv[1]
         filepath = os.path.join(os.getcwd(), filepath)
         data = data_from_csv(filepath)
+        self.ip_addresses.update(data)
         for entry in data:
-            entry = ip_address(entry)
-            self.ip_addresses.append(entry)
             self.log(f"[INFO] IP found: {entry}")
 
     def apply_ip_range(self):
@@ -343,10 +343,10 @@ class RigolTestApp(tk.Tk):
             self.tree.delete(item)
         
         # Ricrea la lista degli IP
-        self.ip_addresses = []
+        self.ip_addresses.clear()
         for ip_int in range(int(start_addr), int(end_addr) + 1):
             addr = ip_address(ip_int)
-            self.ip_addresses.append(addr)
+            self.ip_addresses.add(addr)
         
         # Resetta i tempi di rilevamento
         self.detection_times.clear()
@@ -367,11 +367,11 @@ class RigolTestApp(tk.Tk):
         Applica i tempi configurati dall'utente.
         """
         try:
-            self.config.timing.pre_check_delay   = int(self.entry_precheck.get())
+            self.config.timing.pre_check_delay   = float(self.entry_precheck.get())
             self.config.timing.loop_check_period  = float(self.entry_checkloop.get())
-            self.config.timing.poweroff_delay = int(self.entry_speg.get())
-            self.config.timing.max_startup_delay = int(self.entry_maxdelay.get())
-            self.cycle_start_count = int(self.entry_cycle_start.get())
+            self.config.timing.poweroff_delay = float(self.entry_speg.get())
+            self.config.timing.max_startup_delay = float(self.entry_maxdelay.get())
+            self.cycle_start_count = float(self.entry_cycle_start.get())
             self.log("[INFO] Impostazioni aggiornate (tempi, max delay, conteggio).")
         except ValueError:
             self.log("[ERRORE] Inserire valori numerici nei campi configurazione.")
