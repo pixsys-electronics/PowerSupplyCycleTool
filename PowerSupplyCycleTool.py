@@ -254,6 +254,12 @@ class RigolTestApp(tk.Tk):
 
         self.tree.pack(fill="x")
 
+        # FIXME scrollbar is not working
+        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        vsb.pack(side='right', fill='y')
+
+        self.tree.configure(yscrollcommand=vsb.set)
+
         # Frame 6: Controlli e Log
         controls_frame = ttk.Frame(self)
         controls_frame.grid(row=5, column=0, padx=10, pady=5, sticky="nsew")
