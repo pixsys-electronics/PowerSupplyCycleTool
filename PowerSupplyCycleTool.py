@@ -115,12 +115,6 @@ class RigolTestApp(tk.Tk):
         self.cycle_start_count = 0
         self.anomaly_count = 0
         
-        # Tempi di default
-        self.TEMPO_PRE_CHECK   = 30
-        self.TEMPO_CHECK_LOOP  = 0.1  # 100ms
-        self.TEMPO_SPEGNIMENTO = 30
-        self.max_startup_delay = 5
-        
         # IP dell'alimentatore
         self.dp832_host = None
         
@@ -192,10 +186,10 @@ class RigolTestApp(tk.Tk):
         times_frame.grid_columnconfigure(1, weight=1)
 
         labels_entries = [
-            ("Attesa prima di controllare IP (Pre-check):", "entry_precheck", self.TEMPO_PRE_CHECK),
-            ("Intervallo tra controlli IP:", "entry_checkloop", self.TEMPO_CHECK_LOOP),
-            ("Durata spegnimento:", "entry_speg", self.TEMPO_SPEGNIMENTO),
-            ("Massimo ritardo avvio dispositivi:", "entry_maxdelay", self.max_startup_delay),
+            ("Attesa prima di controllare IP (Pre-check):", "entry_precheck", self.config.timing.pre_check_delay),
+            ("Intervallo tra controlli IP:", "entry_checkloop", self.config.timing.loop_check_period),
+            ("Durata spegnimento:", "entry_speg", self.config.timing.poweroff_delay),
+            ("Massimo ritardo avvio dispositivi:", "entry_maxdelay", self.config.timing.max_startup_delay),
             ("Conteggio di partenza:", "entry_cycle_start", 0)
         ]
 
@@ -374,10 +368,10 @@ class RigolTestApp(tk.Tk):
         Applica i tempi configurati dall'utente.
         """
         try:
-            self.TEMPO_PRE_CHECK   = int(self.entry_precheck.get())
-            self.TEMPO_CHECK_LOOP  = float(self.entry_checkloop.get())
-            self.TEMPO_SPEGNIMENTO = int(self.entry_speg.get())
-            self.max_startup_delay = int(self.entry_maxdelay.get())
+            self.config.timing.pre_check_delay   = int(self.entry_precheck.get())
+            self.config.timing.loop_check_period  = float(self.entry_checkloop.get())
+            self.config.timing.poweroff_delay = int(self.entry_speg.get())
+            self.config.timing.max_startup_delay = int(self.entry_maxdelay.get())
             self.cycle_start_count = int(self.entry_cycle_start.get())
             self.log("[INFO] Impostazioni aggiornate (tempi, max delay, conteggio).")
         except ValueError:
@@ -498,8 +492,8 @@ class RigolTestApp(tk.Tk):
                 self.gui_queue.put(('update_tree', ip_str, ""))
                 self.gui_queue.put(('remove_tag', ip_str))
             
-            self.log(f"[INFO] Attendo {self.TEMPO_PRE_CHECK} secondi prima del controllo degli IP.")
-            if not self.wait_with_stop_check(self.TEMPO_PRE_CHECK):
+            self.log(f"[INFO] Attendo {self.config.timing.pre_check_delay} secondi prima del controllo degli IP.")
+            if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
                 break
 
             t0 = None
@@ -534,7 +528,7 @@ class RigolTestApp(tk.Tk):
                                     t0 = detection_time
                                 else:
                                     elapsed_since_t0 = (detection_time - t0).total_seconds()
-                                    if elapsed_since_t0 > self.max_startup_delay:
+                                    if elapsed_since_t0 > self.config.timing.max_startup_delay:
                                         if ip not in current_cycle_defectives:
                                             self.log(f"[ALLARME] IP {ip} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
                                             self.anomaly_count += 1
@@ -552,18 +546,18 @@ class RigolTestApp(tk.Tk):
 
                 if t0:
                     elapsed_since_t0 = (datetime.datetime.now() - t0).total_seconds()
-                    if elapsed_since_t0 > self.max_startup_delay:
+                    if elapsed_since_t0 > self.config.timing.max_startup_delay:
                         non_rilevati = [ip for ip in self.ip_addresses if self.detection_times[ip] is None]
                         if non_rilevati:
                             for ip in non_rilevati:
                                 if ip not in current_cycle_defectives:
-                                    self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.max_startup_delay} secondi.")
+                                    self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
                                     self.gui_queue.put(('highlight_error', ip))
                                     self.anomaly_count += 1
                                     self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
                                     current_cycle_defectives.add(ip)
             
-                if not self.wait_with_stop_check(self.TEMPO_CHECK_LOOP):
+                if not self.wait_with_stop_check(self.config.timing.loop_check_period):
                     break
 
             if not self.run_test:
@@ -578,8 +572,8 @@ class RigolTestApp(tk.Tk):
                 for channel in (1, 2):
                     alimentatore.select_output(channel)
                     alimentatore.toggle_output(channel, 'OFF')
-                self.log(f"[INFO] Attendo {self.TEMPO_SPEGNIMENTO} secondi durante lo spegnimento...")
-                if not self.wait_with_stop_check(self.TEMPO_SPEGNIMENTO):
+                self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
+                if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
                     break
             except Exception as e:
                 self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
@@ -591,8 +585,8 @@ class RigolTestApp(tk.Tk):
                 for channel in (1, 2):
                     alimentatore.select_output(channel)
                     alimentatore.toggle_output(channel, 'OFF')
-                self.log(f"[INFO] Attendo {self.TEMPO_SPEGNIMENTO} secondi durante lo spegnimento finale...")
-                time.sleep(self.TEMPO_SPEGNIMENTO)
+                self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento finale...")
+                time.sleep(self.config.timing.poweroff_delay)
             except Exception as e:
                 self.log(f"[ERRORE] Errore durante lo spegnimento finale: {str(e)}")
         
@@ -710,11 +704,11 @@ class RigolTestApp(tk.Tk):
 
     def wait_with_stop_check(self, seconds):
         """Esegue attese a piccoli step verificando se il test è ancora attivo."""
-        steps = int(seconds / self.TEMPO_CHECK_LOOP)
+        steps = int(seconds / self.config.timing.loop_check_period)
         for _ in range(steps):
             if not self.run_test:
                 return False
-            time.sleep(self.TEMPO_CHECK_LOOP)
+            time.sleep(self.config.timing.loop_check_period)
         return True
 
 # Avvio dell'applicazione
