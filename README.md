@@ -1,6 +1,9 @@
 # PowerSupplyCycleTool
 Power supply tool
 
+## Env
+- Python 3.11.2
+
 ## Setup (Linux - Debian 12)
 ```sh
 apt install python3-tk
@@ -11,5 +14,6 @@ pip install -r requirements.txt
 
 ## Run
 ```sh
-python3 PowerSupplyCycleTool.py
+# python PowerSupplyCycleTool.py <address_csv> <config_json>
+python PowerSupplyCycleTool.py config.csv config.json
 ```
