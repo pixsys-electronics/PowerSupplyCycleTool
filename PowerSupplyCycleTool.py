@@ -11,14 +11,74 @@ import requests
 import csv
 import os
 import sys
+import json
+from ipaddress import IPv4Address, ip_address
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
+class TestBenchConnectionConfig:
+    psu_address: IPv4Address
+    start_address: IPv4Address
+    end_address: IPv4Address
+
+    def __init__(self, psu_address: IPv4Address, start_address: IPv4Address, end_address: IPv4Address):
+        self.psu_address = psu_address
+        self.start_address = start_address
+        self.end_address = end_address    
+
+class TestBenchTimingConfig:
+    pre_check_delay: float
+    loop_check_period: float
+    poweroff_delay: float
+    max_startup_delay: float
+
+    def __init__(self, pre_check_delay: float, loop_check_period: float, poweroff_delay: float, max_startup_delay: float):
+        self.pre_check_delay = pre_check_delay
+        self.loop_check_period = loop_check_period
+        self.poweroff_delay = poweroff_delay
+        self.max_startup_delay = max_startup_delay
+        
+
+class TestBenchConfig:
+    connection: TestBenchConnectionConfig
+    timing: TestBenchTimingConfig
+
+    def __init__(self, connection: TestBenchConnectionConfig, timing: TestBenchTimingConfig):
+        self.connection = connection
+        self.timing = timing
+    
+    @staticmethod
+    def from_json(file_path: str):
+        data = config_from_json(file_path)
+        
+        connection = data["connection"]
+        psu_address = ip_address(connection["psu_address"])
+        start_address = ip_address(connection["start_address"])
+        end_address = ip_address(connection["end_address"])
+        connection = TestBenchConnectionConfig(psu_address, start_address, end_address)
+
+        timing = data["timing"]
+        pre_check_delay = float(timing["pre_check_delay"])
+        loop_check_period = float(timing["loop_check_period"])
+        poweroff_delay = float(timing["poweroff_delay"])
+        max_startup_delay = float(timing["max_startup_delay"])
+    
+        timing = TestBenchTimingConfig(pre_check_delay, loop_check_period, poweroff_delay, max_startup_delay)
+
+        return TestBenchConfig(connection, timing)
+
 
 # Define di configurazione facilmente modificabile
 DEFAULT_VERIFICATION_SUFFIX = ":9443"
 
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
+
+def config_from_json(file_path: str):
+    data = {}
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    return data
 
 def data_from_csv(file_path: str):
     data: list[dict] = []
@@ -48,15 +108,11 @@ def int_to_ip(ip_int):
     ])
 
 class RigolTestApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, config: TestBenchConfig):
         super().__init__()
         self.geometry("1280x800")
         self.title("Rigol Test GUI")
-        
-        # Parametri di default
-        self.default_alimentatore_ip = "192.168.60.96"
-        self.default_range_start = "192.168.60.10"
-        self.default_range_end   = "192.168.60.21"
+        self.config: TestBenchConfig = config
         
         # Stringa di verifica configurabile (viene impostata tramite GUI)
         self.verification_suffix = DEFAULT_VERIFICATION_SUFFIX
@@ -121,17 +177,17 @@ class RigolTestApp(tk.Tk):
         # Riga 0: IP Alimentatore, IP Start e IP End
         ttk.Label(range_frame, text="IP Alimentatore:").grid(row=0, column=0, padx=5, pady=5)
         self.dp832_entry = ttk.Entry(range_frame, width=15)
-        self.dp832_entry.insert(0, self.default_alimentatore_ip)
+        self.dp832_entry.insert(0, str(self.config.connection.psu_address))
         self.dp832_entry.grid(row=0, column=1, padx=5)
 
         ttk.Label(range_frame, text="IP Start:").grid(row=0, column=2, padx=5)
         self.start_ip_entry = ttk.Entry(range_frame, width=15)
-        self.start_ip_entry.insert(0, self.default_range_start)
+        self.start_ip_entry.insert(0, str(self.config.connection.start_address))
         self.start_ip_entry.grid(row=0, column=3, padx=5)
 
         ttk.Label(range_frame, text="IP End:").grid(row=0, column=4, padx=5)
         self.end_ip_entry = ttk.Entry(range_frame, width=15)
-        self.end_ip_entry.insert(0, self.default_range_end)
+        self.end_ip_entry.insert(0, str(self.config.connection.end_address))
         self.end_ip_entry.grid(row=0, column=5, padx=5)
 
         # Riga 1: Campo per l'URL di verifica
@@ -686,5 +742,8 @@ class RigolTestApp(tk.Tk):
 
 # Avvio dell'applicazione
 if __name__ == "__main__":
-    app = RigolTestApp()
+    config_path = sys.argv[2]
+    config_path = os.path.join(os.getcwd(), config_path)
+    config = TestBenchConfig.from_json(config_path)
+    app = RigolTestApp(config)
     app.mainloop()
