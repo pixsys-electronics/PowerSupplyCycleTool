@@ -8,6 +8,10 @@ import subprocess
 import concurrent.futures
 from urllib3.exceptions import InsecureRequestWarning
 import requests
+import csv
+import os
+import sys
+
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 # Define di configurazione facilmente modificabile
@@ -15,6 +19,13 @@ DEFAULT_VERIFICATION_SUFFIX = ":9443"
 
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
+
+def data_from_csv(file_path: str):
+    data: list[dict] = []
+    with open(file_path, mode='r') as file:
+        csv_reader = csv.DictReader(file, delimiter=';')
+        data = [row['address'] for row in csv_reader]
+    return data
 
 def ip_to_int(ip_str):
     parts = ip_str.split(".")
@@ -133,6 +144,10 @@ class RigolTestApp(tk.Tk):
         # Riga 2: Pulsante per applicare il range e la configurazione
         self.apply_button = ttk.Button(range_frame, text="Applica Range", command=self.apply_ip_range)
         self.apply_button.grid(row=2, column=0, columnspan=6, padx=5, pady=5)
+
+        # Riga 3: Pulsante per importare una lista di indirizzi da un file di configurazione
+        self.apply_button = ttk.Button(range_frame, text="Importa da file", command=self.retrieve_ip_list_from_config)
+        self.apply_button.grid(row=3, column=0, columnspan=6, padx=5, pady=5)
 
         # Frame 2: Configurazione Tempi
         times_frame = ttk.LabelFrame(self, text="Configurazione Tempi (in secondi)")
@@ -267,6 +282,14 @@ class RigolTestApp(tk.Tk):
         except Exception as e:
             self.log(f"[DEBUG] IP {ip} verifica fallita: {e}")
             return False
+    
+    def retrieve_ip_list_from_config(self):
+        filepath = sys.argv[1]
+        filepath = os.path.join(os.getcwd(), filepath)
+        data = data_from_csv(filepath)
+        for entry in data:
+            self.ip_addresses.append(entry)
+            self.log(f"[INFO] IP found: {entry}")
 
     def apply_ip_range(self):
         """
