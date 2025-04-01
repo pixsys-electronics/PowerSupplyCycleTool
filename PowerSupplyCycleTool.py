@@ -87,26 +87,6 @@ def data_from_csv(file_path: str):
         data = [row['address'] for row in csv_reader]
     return data
 
-def ip_to_int(ip_str):
-    parts = ip_str.split(".")
-    if len(parts) != 4:
-        raise ValueError(f"IP non valido: {ip_str}")
-    nums = [int(p) for p in parts]
-    for n in nums:
-        if n < 0 or n > 255:
-            raise ValueError(f"Valore IP fuori range (0-255): {ip_str}")
-    return (nums[0] << 24) + (nums[1] << 16) + (nums[2] << 8) + nums[3]
-
-def int_to_ip(ip_int):
-    if ip_int < 0 or ip_int > 0xFFFFFFFF:
-        raise ValueError(f"IP int fuori range: {ip_int}")
-    return ".".join([
-        str((ip_int >> 24) & 0xFF),
-        str((ip_int >> 16) & 0xFF),
-        str((ip_int >> 8) & 0xFF),
-        str(ip_int & 0xFF)
-    ])
-
 class RigolTestApp(tk.Tk):
     def __init__(self, config: TestBenchConfig):
         super().__init__()
