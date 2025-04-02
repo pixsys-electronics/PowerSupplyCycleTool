@@ -178,7 +178,7 @@ class RigolTestApp(tk.Tk):
 
         # Riga 3: Pulsante per importare una lista di indirizzi da un file di configurazione
         self.apply_button = ttk.Button(range_frame, text="Importa da file", command=self.retrieve_ip_list_from_config)
-        self.apply_button.grid(row=3, column=0, columnspan=6, padx=5, pady=5)
+        self.apply_button.grid(row=2, column=1, columnspan=7, padx=5, pady=5)
 
         # Frame 2: Configurazione Tempi
         times_frame = ttk.LabelFrame(self, text="Configurazione Tempi (in secondi)")
@@ -289,6 +289,7 @@ class RigolTestApp(tk.Tk):
         ttk.Label(controls_frame, text="Log:").grid(row=1, column=0, sticky="w")
         self.log_text = scrolledtext.ScrolledText(controls_frame, wrap=tk.WORD)
         self.log_text.grid(row=2, column=0, sticky="nsew")
+        self.log_text.config(height=10)
 
 
 
