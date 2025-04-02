@@ -224,17 +224,23 @@ class RigolTestApp(tk.Tk):
 
         # self.manual_frame.grid_columnconfigure(3, weight=1)
 
+        self.start_button = ttk.Button(self.manual_frame, text="Start", command=self.start_test)
+        self.start_button.pack(side="left", padx=5, pady=5)
+
+        self.stop_button = ttk.Button(self.manual_frame, text="Stop", command=self.stop_test)
+        self.stop_button.pack(side="left", padx=5, pady=5)
+
         self.pause_button = ttk.Button(self.manual_frame, text="Pausa", command=self.toggle_pause)
-        self.pause_button.grid(row=0, column=0, padx=5, pady=5)
+        self.pause_button.pack(side="left", padx=5, pady=5)
 
         self.force_on_button = ttk.Button(self.manual_frame, text="Forza ON", command=self.force_power_on)
-        self.force_on_button.grid(row=0, column=1, padx=5, pady=5)
+        self.force_on_button.pack(side="left", padx=5, pady=5)
 
         self.force_off_button = ttk.Button(self.manual_frame, text="Forza OFF", command=self.force_power_off)
-        self.force_off_button.grid(row=0, column=2, padx=5, pady=5)
+        self.force_off_button.pack(side="left", padx=5, pady=5)
 
         self.pause_status_label = ttk.Label(self.manual_frame, text="Stato: In esecuzione")
-        self.pause_status_label.grid(row=0, column=3, padx=5, pady=5)
+        self.pause_status_label.pack(side="left", padx=5, pady=5)
     
     def init_params_frame(self, parent, row, col):
         # Frame 2: Configurazione Tempi
@@ -307,27 +313,14 @@ class RigolTestApp(tk.Tk):
     
     def init_log_frame(self, parent, row, col):
         # Frame 6: Controlli e Log
-        self.controls_frame = ttk.Frame(parent)
+        self.controls_frame = ttk.LabelFrame(parent, text="Log")
         self.controls_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nsew")
 
-        # self.controls_frame.grid_columnconfigure(0, weight=1)
-        # self.controls_frame.grid_rowconfigure(1, weight=1)
-
-        # Pulsanti Start/Stop
-        button_frame = ttk.Frame(self.controls_frame)
-        button_frame.grid(row=0, column=0, sticky="ew")
-
-        self.start_button = ttk.Button(button_frame, text="Start", command=self.start_test)
-        self.start_button.pack(side="left", padx=5)
-
-        self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_test)
-        self.stop_button.pack(side="left", padx=5)
-
         # Area Log
-        ttk.Label(self.controls_frame, text="Log:").grid(row=1, column=0, sticky="w")
+        # ttk.LabelFrame(self.controls_frame, text="Log").grid(row=1, column=0, sticky="w")
         self.log_text = scrolledtext.ScrolledText(self.controls_frame, wrap=tk.WORD)
         self.log_text.grid(row=2, column=0, sticky="nsew")
-        self.log_text.config(height=10)
+        self.log_text.config(height=17)
 
     
     def apply_url_file(self):
