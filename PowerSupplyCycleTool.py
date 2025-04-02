@@ -81,6 +81,7 @@ def config_from_json(file_path: str):
         data = json.load(file)
     return data
 
+# FIXME URL could be made in a different way
 def data_from_csv(file_path: str) -> OrderedSet[str]:
     data: OrderedSet[str] = OrderedSet()
     with open(file_path, mode='r') as file:
@@ -152,47 +153,61 @@ class RigolTestApp(tk.Tk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)  # l'area log
 
-        # Frame 1: IP Alimentatore, Range IP e URL di verifica
-        range_frame = ttk.LabelFrame(self, text="Alimentatore e Range IP")
-        range_frame.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
+        self.init_psu_frame(self, 0, 0)
+        self.init_params_frame(self, 1, 0)
+        self.init_info_frame(self, 2, 0)
+        self.init_command_frame(self, 3, 0)
+        self.init_ip_table(self, 4, 0)
+        self.init_log_frame(self, 5, 0)
+        self.init_url_file_frame(self, 6, 0)
+    
+    def init_url_file_frame(self, parent, row, col):
+        url_file_frame = ttk.Frame(parent)
+        url_file_frame.grid(row=row, column=col, padx=5, pady=5)
 
-        range_frame.grid_columnconfigure(6, weight=1)
+        self.url_file = scrolledtext.ScrolledText(url_file_frame)
+        self.url_file.grid(row=0, column=0)
+        self.url_file.config(height=10)
+    
+    def init_info_frame(self, parent, row, col):
+        # Frame 3: Info frame (timer, contatori)
+        info_frame = ttk.Frame(parent)
+        info_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
 
-        # Riga 0: IP Alimentatore, IP Start e IP End
-        ttk.Label(range_frame, text="IP Alimentatore:").grid(row=0, column=0, padx=5, pady=5)
-        self.dp832_entry = ttk.Entry(range_frame, width=15)
-        self.dp832_entry.insert(0, str(self.config.connection.psu_address))
-        self.dp832_entry.grid(row=0, column=1, padx=5)
+        self.elapsed_time_label = ttk.Label(info_frame, text="Test non ancora partito.")
+        self.elapsed_time_label.pack(side="left", padx=5)
 
-        ttk.Label(range_frame, text="IP Start:").grid(row=0, column=2, padx=5)
-        self.start_ip_entry = ttk.Entry(range_frame, width=15)
-        self.start_ip_entry.insert(0, str(self.config.connection.start_address))
-        self.start_ip_entry.grid(row=0, column=3, padx=5)
+        self.cycle_count_label = ttk.Label(info_frame, text="Accensioni eseguite: 0")
+        self.cycle_count_label.pack(side="left", padx=20)
 
-        ttk.Label(range_frame, text="IP End:").grid(row=0, column=4, padx=5)
-        self.end_ip_entry = ttk.Entry(range_frame, width=15)
-        self.end_ip_entry.insert(0, str(self.config.connection.end_address))
-        self.end_ip_entry.grid(row=0, column=5, padx=5)
+        self.anomaly_count_label = ttk.Label(info_frame, text="Accensioni con anomalia: 0")
+        self.anomaly_count_label.pack(side="left", padx=20)
+    
+    def init_command_frame(self, parent, row, col):
+        # Frame 4: Controlli manuali
+        self.manual_frame = ttk.LabelFrame(parent, text="Controlli Manuali")
+        self.manual_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
 
-        # Riga 1: Campo per l'URL di verifica
-        ttk.Label(range_frame, text="URL di verifica:").grid(row=1, column=0, padx=5, pady=5)
-        self.verification_suffix_entry = ttk.Entry(range_frame, width=20)
-        self.verification_suffix_entry.insert(0, self.config.connection.url)
-        self.verification_suffix_entry.grid(row=1, column=1, padx=5, pady=5, columnspan=2, sticky="w")
+        self.manual_frame.grid_columnconfigure(3, weight=1)
 
-        # Riga 2: Pulsante per applicare il range e la configurazione
-        self.apply_button = ttk.Button(range_frame, text="Applica Range", command=self.apply_ip_range)
-        self.apply_button.grid(row=2, column=0, columnspan=6, padx=5, pady=5)
+        self.pause_button = ttk.Button(self.manual_frame, text="Pausa", command=self.toggle_pause)
+        self.pause_button.grid(row=0, column=0, padx=5, pady=5)
 
-        # Riga 3: Pulsante per importare una lista di indirizzi da un file di configurazione
-        self.apply_button = ttk.Button(range_frame, text="Importa da file", command=self.retrieve_ip_list_from_config)
-        self.apply_button.grid(row=2, column=1, columnspan=7, padx=5, pady=5)
+        self.force_on_button = ttk.Button(self.manual_frame, text="Forza ON", command=self.force_power_on)
+        self.force_on_button.grid(row=0, column=1, padx=5, pady=5)
 
+        self.force_off_button = ttk.Button(self.manual_frame, text="Forza OFF", command=self.force_power_off)
+        self.force_off_button.grid(row=0, column=2, padx=5, pady=5)
+
+        self.pause_status_label = ttk.Label(self.manual_frame, text="Stato: In esecuzione")
+        self.pause_status_label.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+    
+    def init_params_frame(self, parent, row, col):
         # Frame 2: Configurazione Tempi
-        times_frame = ttk.LabelFrame(self, text="Configurazione Tempi (in secondi)")
-        times_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        self.times_frame = ttk.LabelFrame(parent, text="Configurazione Tempi (in secondi)")
+        self.times_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
 
-        times_frame.grid_columnconfigure(1, weight=1)
+        self.times_frame.grid_columnconfigure(1, weight=1)
 
         labels_entries = [
             ("Attesa prima di controllare IP (Pre-check):", "entry_precheck", self.config.timing.pre_check_delay),
@@ -203,55 +218,38 @@ class RigolTestApp(tk.Tk):
         ]
 
         for idx, (label_text, entry_name, default_value) in enumerate(labels_entries):
-            ttk.Label(times_frame, text=label_text).grid(row=idx, column=0, sticky="w", padx=5, pady=2)
-            entry = ttk.Entry(times_frame, width=6)
+            ttk.Label(self.times_frame, text=label_text).grid(row=idx, column=0, sticky="w", padx=5, pady=2)
+            entry = ttk.Entry(self.times_frame, width=6)
             entry.insert(0, str(default_value))
             entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             setattr(self, entry_name, entry)
 
-        self.btn_applica_tempi = ttk.Button(times_frame, text="Applica Impostazioni", 
+        self.btn_applica_tempi = ttk.Button(self.times_frame, text="Applica Impostazioni", 
                                             command=self.apply_time_settings)
         self.btn_applica_tempi.grid(row=len(labels_entries), column=0, columnspan=2, pady=5)
+    
+    def init_psu_frame(self, parent, row, col):
+        # Frame 1: IP Alimentatore, Range IP e URL di verifica
+        self.range_frame = ttk.LabelFrame(parent, text="Alimentatore")
+        self.range_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
 
-        # Frame 3: Info frame (timer, contatori)
-        info_frame = ttk.Frame(self)
-        info_frame.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+        self.range_frame.grid_columnconfigure(6, weight=1)
 
-        self.elapsed_time_label = ttk.Label(info_frame, text="Test non ancora partito.")
-        self.elapsed_time_label.pack(side="left", padx=5)
-
-        self.cycle_count_label = ttk.Label(info_frame, text="Accensioni eseguite: 0")
-        self.cycle_count_label.pack(side="left", padx=20)
-
-        self.anomaly_count_label = ttk.Label(info_frame, text="Accensioni con anomalia: 0")
-        self.anomaly_count_label.pack(side="left", padx=20)
-
-        # Frame 4: Controlli manuali
-        manual_frame = ttk.LabelFrame(self, text="Controlli Manuali")
-        manual_frame.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
-
-        manual_frame.grid_columnconfigure(3, weight=1)
-
-        self.pause_button = ttk.Button(manual_frame, text="Pausa", command=self.toggle_pause)
-        self.pause_button.grid(row=0, column=0, padx=5, pady=5)
-
-        self.force_on_button = ttk.Button(manual_frame, text="Forza ON", command=self.force_power_on)
-        self.force_on_button.grid(row=0, column=1, padx=5, pady=5)
-
-        self.force_off_button = ttk.Button(manual_frame, text="Forza OFF", command=self.force_power_off)
-        self.force_off_button.grid(row=0, column=2, padx=5, pady=5)
-
-        self.pause_status_label = ttk.Label(manual_frame, text="Stato: In esecuzione")
-        self.pause_status_label.grid(row=0, column=3, padx=5, pady=5, sticky="w")
-
+        # Riga 0: IP Alimentatore, IP Start e IP End
+        ttk.Label(self.range_frame, text="IP Alimentatore:").grid(row=0, column=0, padx=5, pady=5)
+        self.dp832_entry = ttk.Entry(self.range_frame, width=15)
+        self.dp832_entry.insert(0, str(self.config.connection.psu_address))
+        self.dp832_entry.grid(row=0, column=1, padx=5)
+    
+    def init_ip_table(self, parent, row, col):
         # Frame 5: Tabella IP
-        table_frame = ttk.Frame(self)
-        table_frame.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
+        self.table_frame = ttk.Frame(parent)
+        self.table_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
 
-        ttk.Label(table_frame, text="Stato IP (Mostra orario di rilevamento):").pack(anchor="w")
+        ttk.Label(self.table_frame, text="Stato IP (Mostra orario di rilevamento):").pack(anchor="w")
 
         columns = ("ip", "detected")
-        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
         self.tree.heading("ip", text="Indirizzo IP")
         self.tree.heading("detected", text="Rilevato alle (HH:MM:SS)")
         self.tree.column("ip", width=200)
@@ -268,20 +266,21 @@ class RigolTestApp(tk.Tk):
         self.tree.pack(side='left', fill='both', expand=True)
 
         # Scrollbar
-        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        vsb = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.tree.yview)
         vsb.pack(side='right', fill='y')
 
         self.tree.configure(yscrollcommand=vsb.set)
-
+    
+    def init_log_frame(self, parent, row, col):
         # Frame 6: Controlli e Log
-        controls_frame = ttk.Frame(self)
-        controls_frame.grid(row=5, column=0, padx=10, pady=5, sticky="nsew")
+        self.controls_frame = ttk.Frame(parent)
+        self.controls_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nsew")
 
-        controls_frame.grid_columnconfigure(0, weight=1)
-        controls_frame.grid_rowconfigure(1, weight=1)
+        self.controls_frame.grid_columnconfigure(0, weight=1)
+        self.controls_frame.grid_rowconfigure(1, weight=1)
 
         # Pulsanti Start/Stop
-        button_frame = ttk.Frame(controls_frame)
+        button_frame = ttk.Frame(self.controls_frame)
         button_frame.grid(row=0, column=0, sticky="ew")
 
         self.start_button = ttk.Button(button_frame, text="Start", command=self.start_test)
@@ -294,18 +293,13 @@ class RigolTestApp(tk.Tk):
         self.clear_button.pack(side="left", padx=5)
 
         # Area Log
-        ttk.Label(controls_frame, text="Log:").grid(row=1, column=0, sticky="w")
-        self.log_text = scrolledtext.ScrolledText(controls_frame, wrap=tk.WORD)
+        ttk.Label(self.controls_frame, text="Log:").grid(row=1, column=0, sticky="w")
+        self.log_text = scrolledtext.ScrolledText(self.controls_frame, wrap=tk.WORD)
         self.log_text.grid(row=2, column=0, sticky="nsew")
         self.log_text.config(height=10)
 
-
-
-
-
-
-
-
+    
+    
     def ip_responds(self, ip):
         """Verifica se l'IP risponde utilizzando requests, usando la configurazione dell'URL."""
         protocol = "http" if self.verification_suffix.startswith(":80") else "https"
@@ -318,9 +312,6 @@ class RigolTestApp(tk.Tk):
             return False
 
     def ip_responds_curl(self, url: str):
-        """Verifica se l'IP risponde utilizzando curl e la stringa di verifica configurata."""
-        protocol = "http" if self.verification_suffix.startswith(":80") else "https"
-        url = f"{protocol}://{url}"
         try:
             result = subprocess.run(
                 ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
@@ -350,33 +341,6 @@ class RigolTestApp(tk.Tk):
         
         self.refresh_address_table()
 
-    def apply_ip_range(self):
-        """
-        Applica il range IP e la configurazione dell'URL di verifica inseriti dall'utente.
-        """
-        self.dp832_host = self.dp832_entry.get().strip()
-        start_addr = ip_address(self.start_ip_entry.get().strip())
-        end_addr = ip_address(self.end_ip_entry.get().strip())
-        # Aggiorna la stringa di verifica dall'apposito campo
-        self.verification_suffix = self.verification_suffix_entry.get().strip()
-        if not self.verification_suffix:
-            self.verification_suffix = self.config.connection.url
-
-        if start_addr > end_addr:
-            self.log("[ERRORE] IP Start deve essere <= IP End.")
-            return
-        
-        for ip_int in range(int(start_addr), int(end_addr) + 1):
-            addr = ip_address(ip_int)
-            ip = f"{addr}{self.verification_suffix}"
-            self.urls.add(ip)
-        
-        self.refresh_address_table()
-
-        self.log(f"[INFO] Impostato IP Alimentatore: {self.dp832_host}")
-        self.log(f"[INFO] Range IP: {str(start_addr)} -> {str(end_addr)} (tot: {len(self.urls)})")
-        self.log(f"[INFO] URL di verifica impostato a: {self.verification_suffix}")
-    
     def refresh_address_table(self):
         # Pulisce la Treeview
         for item in self.tree.get_children():
@@ -740,5 +704,8 @@ if __name__ == "__main__":
     config_path = sys.argv[1]
     config_path = os.path.join(os.getcwd(), config_path)
     config = TestBenchConfig.from_json(config_path)
+    url_list_path = os.path.join(os.getcwd(), "config.csv")
+    with open(url_list_path) as f: s = f.read()
+    print(s)
     app = RigolTestApp(config)
     app.mainloop()
