@@ -267,36 +267,27 @@ class RigolTestApp(tk.Tk):
             entry.insert(0, str(default_value))
             entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             setattr(self, entry_name, entry)
-
-        self.btn_applica_tempi = ttk.Button(self.times_frame, text="Applica Impostazioni", 
-                                            command=self.apply_time_settings)
-        self.btn_applica_tempi.grid(row=len(labels_entries), column=0, columnspan=2, pady=5)
     
     # TODO each _var is created inside the loop right above here. Please declare them as class properties
     def on_entry_precheck_change(self, *args):
         if hasattr(self, "entry_precheck_var"):
             self.config.timing.pre_check_delay = self.entry_precheck_var.get()
-        print("precheck", self.config.timing.pre_check_delay)
 
     def on_entry_checkloop_change(self, *args):
         if hasattr(self, "entry_checkloop_var"):
             self.config.timing.loop_check_period = self.entry_checkloop_var.get()
-        print("loop_check", self.config.timing.loop_check_period)
 
     def on_entry_speg_change(self, *args):
         if hasattr(self, "entry_speg_var"):
             self.config.timing.poweroff_delay = self.entry_speg_var.get()
-        print("poweroff", self.config.timing.poweroff_delay)
     
     def on_entry_cycle_start_change(self, *args):
         if hasattr(self, "entry_cycle_start_var"):
             self.config.timing.cycle_start = self.entry_cycle_start_var.get()
-        print("cycle start", self.config.timing.cycle_start)
     
     def on_entry_maxdelay_change(self, *args):
         if hasattr(self, "entry_maxdelay_var"):
             self.config.timing.max_startup_delay = self.entry_maxdelay_var.get()
-        print("max startup delay", self.config.timing.max_startup_delay)
     
     def init_psu_frame(self, parent, row, col):
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
