@@ -160,10 +160,10 @@ class RigolTestApp(tk.Tk):
         self.init_url_file_frame(right_frame, 0, 0)
     
     def init_url_file_frame(self, parent, row, col):
-        url_file_frame = ttk.Frame(parent)
-        url_file_frame.grid(row=row, column=col, padx=5, pady=5)
+        self.url_file_frame = ttk.Frame(parent)
+        self.url_file_frame.grid(row=row, column=col, padx=5, pady=5)
 
-        self.url_file = scrolledtext.ScrolledText(url_file_frame)
+        self.url_file = scrolledtext.ScrolledText(self.url_file_frame)
         self.url_file.grid(row=0, column=0)
         self.url_file.config(height=20)
 
@@ -171,8 +171,8 @@ class RigolTestApp(tk.Tk):
         with open(url_list_path) as f: content = f.read()
         self.url_file.insert('1.0', content)
 
-        self.apply_button = ttk.Button(self.manual_frame, text="Apply", command=self.apply_url_file)
-        self.apply_button.grid(row=0, column=0, padx=5, pady=5)
+        self.apply_button = ttk.Button(self.url_file_frame, text="Apply", command=self.apply_url_file)
+        self.apply_button.grid(row=1, column=0, padx=5, pady=5)
     
     def init_info_frame(self, parent, row, col):
         # Frame 3: Info frame (timer, contatori)
@@ -308,6 +308,10 @@ class RigolTestApp(tk.Tk):
         content = self.url_file.get("1.0", "end-1c")
         self.urls = url_list_from_csv(content)
         self.refresh_address_table()
+        
+        url_list_path = os.path.join(os.getcwd(), self.ip_addresses_config_path)
+        with open(url_list_path, mode="w", encoding="utf-8") as file:
+            file.write(content)
 
     def ip_responds(self, ip):
         """Verifica se l'IP risponde utilizzando requests, usando la configurazione dell'URL."""
