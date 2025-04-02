@@ -35,13 +35,15 @@ class TestBenchTimingConfig:
     loop_check_period: float
     poweroff_delay: float
     max_startup_delay: float
+    cycle_start: int
 
-    def __init__(self, pre_check_delay: float, loop_check_period: float, poweroff_delay: float, max_startup_delay: float):
+    def __init__(self, pre_check_delay: float, loop_check_period: float, poweroff_delay: float, max_startup_delay: float, cycle_start: int):
         self.pre_check_delay = pre_check_delay
         self.loop_check_period = loop_check_period
         self.poweroff_delay = poweroff_delay
         self.max_startup_delay = max_startup_delay
-        
+        self.cycle_start = cycle_start
+
 
 class TestBenchConfig:
     connection: TestBenchConnectionConfig
@@ -67,8 +69,9 @@ class TestBenchConfig:
         loop_check_period = float(timing["loop_check_period"])
         poweroff_delay = float(timing["poweroff_delay"])
         max_startup_delay = float(timing["max_startup_delay"])
+        cycle_start = int(timing["cycle_start"])
     
-        timing = TestBenchTimingConfig(pre_check_delay, loop_check_period, poweroff_delay, max_startup_delay)
+        timing = TestBenchTimingConfig(pre_check_delay, loop_check_period, poweroff_delay, max_startup_delay, cycle_start)
 
         return TestBenchConfig(connection, timing)
 
@@ -244,8 +247,6 @@ class RigolTestApp(tk.Tk):
         self.times_frame = ttk.LabelFrame(parent, text="Configurazione Tempi (in secondi)")
         self.times_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
 
-        # self.times_frame.grid_columnconfigure(1, weight=1)
-
         labels_entries = [
             ("Attesa prima di controllare IP (Pre-check):", "entry_precheck", self.config.timing.pre_check_delay),
             ("Intervallo tra controlli IP:", "entry_checkloop", self.config.timing.loop_check_period),
@@ -256,7 +257,13 @@ class RigolTestApp(tk.Tk):
 
         for idx, (label_text, entry_name, default_value) in enumerate(labels_entries):
             ttk.Label(self.times_frame, text=label_text).grid(row=idx, column=0, sticky="w", padx=5, pady=2)
-            entry = ttk.Entry(self.times_frame, width=6)
+            entry_var = tk.StringVar()
+            callback_name = f"on_{entry_name}_change"
+            callback = getattr(self, callback_name)
+            entry_var.trace_add("write", callback)
+
+            setattr(self, f"{entry_name}_var", entry_var)
+            entry = ttk.Entry(self.times_frame, width=6, textvariable=entry_var)
             entry.insert(0, str(default_value))
             entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             setattr(self, entry_name, entry)
@@ -264,6 +271,32 @@ class RigolTestApp(tk.Tk):
         self.btn_applica_tempi = ttk.Button(self.times_frame, text="Applica Impostazioni", 
                                             command=self.apply_time_settings)
         self.btn_applica_tempi.grid(row=len(labels_entries), column=0, columnspan=2, pady=5)
+    
+    # TODO each _var is created inside the loop right above here. Please declare them as class properties
+    def on_entry_precheck_change(self, *args):
+        if hasattr(self, "entry_precheck_var"):
+            self.config.timing.pre_check_delay = self.entry_precheck_var.get()
+        print("precheck", self.config.timing.pre_check_delay)
+
+    def on_entry_checkloop_change(self, *args):
+        if hasattr(self, "entry_checkloop_var"):
+            self.config.timing.loop_check_period = self.entry_checkloop_var.get()
+        print("loop_check", self.config.timing.loop_check_period)
+
+    def on_entry_speg_change(self, *args):
+        if hasattr(self, "entry_speg_var"):
+            self.config.timing.poweroff_delay = self.entry_speg_var.get()
+        print("poweroff", self.config.timing.poweroff_delay)
+    
+    def on_entry_cycle_start_change(self, *args):
+        if hasattr(self, "entry_cycle_start_var"):
+            self.config.timing.cycle_start = self.entry_cycle_start_var.get()
+        print("cycle start", self.config.timing.cycle_start)
+    
+    def on_entry_maxdelay_change(self, *args):
+        if hasattr(self, "entry_maxdelay_var"):
+            self.config.timing.max_startup_delay = self.entry_maxdelay_var.get()
+        print("max startup delay", self.config.timing.max_startup_delay)
     
     def init_psu_frame(self, parent, row, col):
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
