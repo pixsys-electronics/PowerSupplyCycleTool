@@ -118,9 +118,6 @@ class RigolTestApp(tk.Tk):
         self.cycle_start_count = 0
         self.anomaly_count = 0
         
-        # IP dell'alimentatore
-        self.dp832_host = None
-        
         # File di report
         self.report_file = None
         
@@ -460,14 +457,14 @@ class RigolTestApp(tk.Tk):
         """
         alimentatore = dp832()
         
-        if not self.dp832_host:
+        if not self.config.connection.psu_address:
             self.log("[ERRORE] IP alimentatore non configurato! Interrompo.")
             self.run_test = False
             return
         
-        self.log(f"[INFO] Connessione all'alimentatore {self.dp832_host}...")
+        self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
         try:
-            alimentatore.connect(self.dp832_host)
+            alimentatore.connect(self.config.connection.psu_address)
             alimentatore.set_voltage(1, 26.000)
             alimentatore.set_voltage(2, 26.000)
         except Exception as e:
@@ -684,12 +681,12 @@ class RigolTestApp(tk.Tk):
     def force_power_on(self):
         """Forza manualmente l'accensione dell'alimentatore."""
         try:
-            if not self.dp832_host:
+            if not self.config.connection.psu_address:
                 self.log("[ERRORE] IP alimentatore non configurato!")
                 return
             alimentatore = dp832()
-            self.log(f"[INFO] Connessione all'alimentatore {self.dp832_host}...")
-            alimentatore.connect(self.dp832_host)
+            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            alimentatore.connect(self.config.connection.psu_address)
             for channel in (1, 2):
                 alimentatore.select_output(channel)
                 alimentatore.toggle_output(channel, 'ON')
@@ -700,12 +697,12 @@ class RigolTestApp(tk.Tk):
     def force_power_off(self):
         """Forza manualmente lo spegnimento dell'alimentatore."""
         try:
-            if not self.dp832_host:
+            if not self.config.connection.psu_address:
                 self.log("[ERRORE] IP alimentatore non configurato!")
                 return
             alimentatore = dp832()
-            self.log(f"[INFO] Connessione all'alimentatore {self.dp832_host}...")
-            alimentatore.connect(self.dp832_host)
+            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            alimentatore.connect(self.config.connection.psu_address)
             for channel in (1, 2):
                 alimentatore.select_output(channel)
                 alimentatore.toggle_output(channel, 'OFF')
