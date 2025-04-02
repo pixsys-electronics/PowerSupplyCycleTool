@@ -144,20 +144,41 @@ class RigolTestApp(tk.Tk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)  # l'area log
 
-        left_frame = tk.Frame(self)
-        left_frame.grid(row=0, column=0)
+        # TOP FRAME
+        top_frame = tk.Frame(self)
+        top_frame.grid(row=0, column=0, sticky="new")
 
-        self.init_psu_frame(left_frame, 0, 0)
-        self.init_params_frame(left_frame, 1, 0)
-        self.init_info_frame(left_frame, 2, 0)
-        self.init_command_frame(left_frame, 3, 0)
-        self.init_ip_table(left_frame, 4, 0)
-        self.init_log_frame(left_frame, 5, 0)
+        # TOP LEFT FRAME
+        top_left_frame = tk.Frame(top_frame)
+        top_left_frame.grid(row=0, column=0, sticky="nw")
+
+        self.init_psu_frame(top_left_frame, 0, 0)
+        self.init_params_frame(top_left_frame, 1, 0)
         
-        right_frame = tk.Frame(self)
-        right_frame.grid(row=0, column=1, sticky="new")
+        # TOP RIGHT FRAME
+        top_right_frame = tk.Frame(top_frame)
+        top_right_frame.grid(row=0, column=1, sticky="ne")
+
+        self.init_url_file_frame(top_right_frame, 0, 0)
         
-        self.init_url_file_frame(right_frame, 0, 0)
+        # BOTTOM FRAME
+        bottom_frame = tk.Frame(self)
+        bottom_frame.grid(row=1, column=0, sticky="sew")
+
+        # BOTTOM LEFT FRAME
+        bottom_left_frame = tk.Frame(bottom_frame)
+        bottom_left_frame.grid(row=0, column=0, sticky="new")
+
+        self.init_info_frame(bottom_left_frame, 0, 0)
+        self.init_command_frame(bottom_frame, 1, 0)
+        self.init_ip_table(bottom_frame, 2, 0)
+        
+        # BOTTOM RIGHT FRAME
+        bottom_right_frame = tk.Frame(bottom_frame)
+        bottom_right_frame.grid(row=0, column=1)
+
+        self.init_log_frame(bottom_right_frame, 0, 0)
+        
     
     def init_url_file_frame(self, parent, row, col):
         self.url_file_frame = ttk.Frame(parent)
@@ -293,9 +314,6 @@ class RigolTestApp(tk.Tk):
 
         self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_test)
         self.stop_button.pack(side="left", padx=5)
-
-        self.clear_button = ttk.Button(button_frame, text="Clear", command=self.clear_address_table)
-        self.clear_button.pack(side="left", padx=5)
 
         # Area Log
         ttk.Label(self.controls_frame, text="Log:").grid(row=1, column=0, sticky="w")
