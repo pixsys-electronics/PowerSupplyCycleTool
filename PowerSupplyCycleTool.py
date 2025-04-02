@@ -396,20 +396,6 @@ class RigolTestApp(tk.Tk):
             self.tree.insert("", tk.END, iid=ip, values=(ip, ""), tags=('normal',))
             self.log(f"[INFO] URL found: {ip}")
         
-    def apply_time_settings(self):
-        """
-        Applica i tempi configurati dall'utente.
-        """
-        try:
-            self.config.timing.pre_check_delay   = float(self.entry_precheck.get())
-            self.config.timing.loop_check_period  = float(self.entry_checkloop.get())
-            self.config.timing.poweroff_delay = float(self.entry_speg.get())
-            self.config.timing.max_startup_delay = float(self.entry_maxdelay.get())
-            self.cycle_start_count = float(self.entry_cycle_start.get())
-            self.log("[INFO] Impostazioni aggiornate (tempi, max delay, conteggio).")
-        except ValueError:
-            self.log("[ERRORE] Inserire valori numerici nei campi configurazione.")
-
     def log(self, message):
         """Aggiunge un messaggio alla coda di log."""
         self.log_queue.put(message)
