@@ -81,12 +81,20 @@ def config_from_json(file_path: str):
         data = json.load(file)
     return data
 
-def data_from_csv(file_path: str) -> OrderedSet[IPv4Address]:
-    data: OrderedSet[IPv4Address] = OrderedSet()
+def data_from_csv(file_path: str) -> OrderedSet[str]:
+    data: OrderedSet[str] = OrderedSet()
     with open(file_path, mode='r') as file:
         csv_reader = csv.DictReader(file, delimiter=';')
-        addresses = [ip_address(row['address']) for row in csv_reader]
-        data.update(addresses)
+        for row in csv_reader:
+            url = row['url']
+            addr = url.split(sep=':')[0]
+            print(addr)
+            try:
+                # make sure the address is valid
+                addr = IPv4Address(addr)
+                data.add(url)
+            except:
+                pass
     return data
 
 class RigolTestApp(tk.Tk):
@@ -100,7 +108,7 @@ class RigolTestApp(tk.Tk):
         self.verification_suffix = self.config.connection.url
         
         # Lista IP e tempi di rilevamento
-        self.ip_addresses: OrderedSet[IPv4Address] = OrderedSet()
+        self.urls: OrderedSet[str] = OrderedSet()
         self.detection_times = {}
         
         # Code per log e comunicazioni verso la GUI
@@ -309,10 +317,10 @@ class RigolTestApp(tk.Tk):
             self.log(f"[DEBUG] IP {ip} non risponde: {e}")
             return False
 
-    def ip_responds_curl(self, ip: IPv4Address):
+    def ip_responds_curl(self, url: str):
         """Verifica se l'IP risponde utilizzando curl e la stringa di verifica configurata."""
         protocol = "http" if self.verification_suffix.startswith(":80") else "https"
-        url = f"{protocol}://{ip}{self.verification_suffix}"
+        url = f"{protocol}://{url}"
         try:
             result = subprocess.run(
                 ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
@@ -322,21 +330,21 @@ class RigolTestApp(tk.Tk):
             )
             return result.stdout.strip() == '200'
         except subprocess.TimeoutExpired:
-            self.log(f"[DEBUG] IP {ip} non risponde: Timeout")
+            self.log(f"[DEBUG] IP {url} non risponde: Timeout")
             return False
         except Exception as e:
-            self.log(f"[DEBUG] IP {ip} verifica fallita: {e}")
+            self.log(f"[DEBUG] IP {url} verifica fallita: {e}")
             return False
     
     def clear_address_table(self):
-        self.ip_addresses.clear()
+        self.urls.clear()
         self.refresh_address_table()
     
     def retrieve_ip_list_from_config(self):
         filepath = self.ip_addresses_config_path
         filepath = os.path.join(os.getcwd(), filepath)
         data = data_from_csv(filepath)
-        self.ip_addresses.update(data)
+        self.urls.update(data)
         for entry in data:
             self.log(f"[INFO] IP found: {entry}")
         
@@ -360,12 +368,13 @@ class RigolTestApp(tk.Tk):
         
         for ip_int in range(int(start_addr), int(end_addr) + 1):
             addr = ip_address(ip_int)
-            self.ip_addresses.add(addr)
+            ip = f"{addr}{self.verification_suffix}"
+            self.urls.add(ip)
         
         self.refresh_address_table()
 
         self.log(f"[INFO] Impostato IP Alimentatore: {self.dp832_host}")
-        self.log(f"[INFO] Range IP: {str(start_addr)} -> {str(end_addr)} (tot: {len(self.ip_addresses)})")
+        self.log(f"[INFO] Range IP: {str(start_addr)} -> {str(end_addr)} (tot: {len(self.urls)})")
         self.log(f"[INFO] URL di verifica impostato a: {self.verification_suffix}")
     
     def refresh_address_table(self):
@@ -375,10 +384,9 @@ class RigolTestApp(tk.Tk):
         
         # Resetta i tempi di rilevamento
         self.detection_times.clear()
-        for ip in self.ip_addresses:
-            ip_str = str(ip)
-            self.detection_times[ip_str] = None
-            self.tree.insert("", tk.END, iid=ip_str, values=(ip_str, ""), tags=('normal',))
+        for ip in self.urls:
+            self.detection_times[ip] = None
+            self.tree.insert("", tk.END, iid=ip, values=(ip, ""), tags=('normal',))
         
     def apply_time_settings(self):
         """
@@ -503,11 +511,10 @@ class RigolTestApp(tk.Tk):
                 self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
                 continue
             
-            for ip in self.ip_addresses:
-                ip_str = str(ip)
-                self.detection_times[str(ip_str)] = None
-                self.gui_queue.put(('update_tree', ip_str, ""))
-                self.gui_queue.put(('remove_tag', ip_str))
+            for ip in self.urls:
+                self.detection_times[ip] = None
+                self.gui_queue.put(('update_tree', ip, ""))
+                self.gui_queue.put(('remove_tag', ip))
             
             self.log(f"[INFO] Attendo {self.config.timing.pre_check_delay} secondi prima del controllo degli IP.")
             if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
@@ -525,7 +532,7 @@ class RigolTestApp(tk.Tk):
                     break
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                    future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.ip_addresses if self.detection_times[ip] is None}
+                    future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
                     
                     for future in concurrent.futures.as_completed(future_to_ip):
                         ip = future_to_ip[future]
@@ -552,7 +559,7 @@ class RigolTestApp(tk.Tk):
                                             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
                                             current_cycle_defectives.add(ip)
             
-                if all(self.detection_times[ip] is not None for ip in self.ip_addresses):
+                if all(self.detection_times[ip] is not None for ip in self.urls):
                     self.log("[INFO] Tutti gli IP hanno risposto.")
                     detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
                     ip_first, t_first = detection_sorted[0]
@@ -564,7 +571,7 @@ class RigolTestApp(tk.Tk):
                 if t0:
                     elapsed_since_t0 = (datetime.datetime.now() - t0).total_seconds()
                     if elapsed_since_t0 > self.config.timing.max_startup_delay:
-                        non_rilevati = [ip for ip in self.ip_addresses if self.detection_times[ip] is None]
+                        non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
                         if non_rilevati:
                             for ip in non_rilevati:
                                 if ip not in current_cycle_defectives:
