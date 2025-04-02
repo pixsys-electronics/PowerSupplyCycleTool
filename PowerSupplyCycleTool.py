@@ -13,6 +13,7 @@ import os
 import sys
 import json
 from ipaddress import IPv4Address, ip_address
+from ordered_set import OrderedSet
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -80,8 +81,8 @@ def config_from_json(file_path: str):
         data = json.load(file)
     return data
 
-def data_from_csv(file_path: str) -> set[IPv4Address]:
-    data: set[IPv4Address] = set()
+def data_from_csv(file_path: str) -> OrderedSet[IPv4Address]:
+    data: OrderedSet[IPv4Address] = OrderedSet()
     with open(file_path, mode='r') as file:
         csv_reader = csv.DictReader(file, delimiter=';')
         addresses = [ip_address(row['address']) for row in csv_reader]
@@ -99,7 +100,7 @@ class RigolTestApp(tk.Tk):
         self.verification_suffix = self.config.connection.url
         
         # Lista IP e tempi di rilevamento
-        self.ip_addresses: set[IPv4Address] = set()
+        self.ip_addresses: OrderedSet[IPv4Address] = OrderedSet()
         self.detection_times = {}
         
         # Code per log e comunicazioni verso la GUI
