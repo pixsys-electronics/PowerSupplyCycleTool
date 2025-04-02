@@ -278,6 +278,9 @@ class RigolTestApp(tk.Tk):
         self.stop_button = ttk.Button(button_frame, text="Stop", command=self.stop_test)
         self.stop_button.pack(side="left", padx=5)
 
+        self.clear_button = ttk.Button(button_frame, text="Clear", command=self.clear_address_table)
+        self.clear_button.pack(side="left", padx=5)
+
         # Area Log
         ttk.Label(controls_frame, text="Log:").grid(row=1, column=0, sticky="w")
         self.log_text = scrolledtext.ScrolledText(controls_frame, wrap=tk.WORD)
@@ -319,6 +322,10 @@ class RigolTestApp(tk.Tk):
         except Exception as e:
             self.log(f"[DEBUG] IP {ip} verifica fallita: {e}")
             return False
+    
+    def clear_address_table(self):
+        self.ip_addresses.clear()
+        self.refresh_address_table()
     
     def retrieve_ip_list_from_config(self):
         filepath = self.ip_addresses_config_path
