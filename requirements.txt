@@ -5,3 +5,4 @@ urllib3
 pyvisa
 netifaces
 netaddr
+ordered-set
