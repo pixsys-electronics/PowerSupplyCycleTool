@@ -141,12 +141,17 @@ class RigolTestApp(tk.Tk):
         Crea tutti i widget (label, entry, treeview, pulsanti) e li posiziona nella finestra principale.
         """
         # Configurazione della griglia principale
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(5, weight=1)  # l'area log
+        # self.grid_columnconfigure(0, weight=1)
+
+        # self.grid_rowconfigure(0, weight=1)
+        # self.grid_rowconfigure(1, weight=1)
 
         # TOP FRAME
         top_frame = tk.Frame(self)
         top_frame.grid(row=0, column=0, sticky="new")
+        top_frame.grid_rowconfigure(0, weight=1)
+        top_frame.grid_columnconfigure(0, weight=1)
+        top_frame.grid_columnconfigure(1, weight=1)
 
         # TOP LEFT FRAME
         top_left_frame = tk.Frame(top_frame)
@@ -163,19 +168,22 @@ class RigolTestApp(tk.Tk):
         
         # BOTTOM FRAME
         bottom_frame = tk.Frame(self)
-        bottom_frame.grid(row=1, column=0, sticky="sew")
+        bottom_frame.grid(row=1, column=0, sticky="new")
+        bottom_frame.grid_rowconfigure(0, weight=1)
+        bottom_frame.grid_columnconfigure(0, weight=1)
+        bottom_frame.grid_columnconfigure(1, weight=1)
 
         # BOTTOM LEFT FRAME
         bottom_left_frame = tk.Frame(bottom_frame)
-        bottom_left_frame.grid(row=0, column=0, sticky="new")
+        bottom_left_frame.grid(row=0, column=0, sticky="nw")
 
-        self.init_info_frame(bottom_left_frame, 0, 0)
-        self.init_command_frame(bottom_frame, 1, 0)
-        self.init_ip_table(bottom_frame, 2, 0)
+        self.init_command_frame(bottom_left_frame, 0, 0)
+        self.init_info_frame(bottom_left_frame, 1, 0)
+        self.init_ip_table(bottom_left_frame, 2, 0)
         
         # BOTTOM RIGHT FRAME
         bottom_right_frame = tk.Frame(bottom_frame)
-        bottom_right_frame.grid(row=0, column=1)
+        bottom_right_frame.grid(row=0, column=1, sticky="ne")
 
         self.init_log_frame(bottom_right_frame, 0, 0)
         
@@ -186,7 +194,7 @@ class RigolTestApp(tk.Tk):
 
         self.url_file = scrolledtext.ScrolledText(self.url_file_frame)
         self.url_file.grid(row=0, column=0)
-        self.url_file.config(height=20)
+        self.url_file.config(height=15)
 
         url_list_path = os.path.join(os.getcwd(), self.ip_addresses_config_path)
         with open(url_list_path) as f: content = f.read()
@@ -198,23 +206,23 @@ class RigolTestApp(tk.Tk):
     def init_info_frame(self, parent, row, col):
         # Frame 3: Info frame (timer, contatori)
         info_frame = ttk.Frame(parent)
-        info_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
+        info_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
 
         self.elapsed_time_label = ttk.Label(info_frame, text="Test non ancora partito.")
         self.elapsed_time_label.pack(side="left", padx=5)
 
         self.cycle_count_label = ttk.Label(info_frame, text="Accensioni eseguite: 0")
-        self.cycle_count_label.pack(side="left", padx=20)
+        self.cycle_count_label.pack(side="left", padx=5)
 
         self.anomaly_count_label = ttk.Label(info_frame, text="Accensioni con anomalia: 0")
-        self.anomaly_count_label.pack(side="left", padx=20)
+        self.anomaly_count_label.pack(side="left", padx=5)
     
     def init_command_frame(self, parent, row, col):
         # Frame 4: Controlli manuali
         self.manual_frame = ttk.LabelFrame(parent, text="Controlli Manuali")
-        self.manual_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
+        self.manual_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nw")
 
-        self.manual_frame.grid_columnconfigure(3, weight=1)
+        # self.manual_frame.grid_columnconfigure(3, weight=1)
 
         self.pause_button = ttk.Button(self.manual_frame, text="Pausa", command=self.toggle_pause)
         self.pause_button.grid(row=0, column=0, padx=5, pady=5)
@@ -226,14 +234,14 @@ class RigolTestApp(tk.Tk):
         self.force_off_button.grid(row=0, column=2, padx=5, pady=5)
 
         self.pause_status_label = ttk.Label(self.manual_frame, text="Stato: In esecuzione")
-        self.pause_status_label.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        self.pause_status_label.grid(row=0, column=3, padx=5, pady=5)
     
     def init_params_frame(self, parent, row, col):
         # Frame 2: Configurazione Tempi
         self.times_frame = ttk.LabelFrame(parent, text="Configurazione Tempi (in secondi)")
-        self.times_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
+        self.times_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
 
-        self.times_frame.grid_columnconfigure(1, weight=1)
+        # self.times_frame.grid_columnconfigure(1, weight=1)
 
         labels_entries = [
             ("Attesa prima di controllare IP (Pre-check):", "entry_precheck", self.config.timing.pre_check_delay),
@@ -259,7 +267,7 @@ class RigolTestApp(tk.Tk):
         self.range_frame = ttk.LabelFrame(parent, text="Alimentatore")
         self.range_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
 
-        self.range_frame.grid_columnconfigure(6, weight=1)
+        # self.range_frame.grid_columnconfigure(6, weight=1)
 
         # Riga 0: IP Alimentatore, IP Start e IP End
         ttk.Label(self.range_frame, text="IP Alimentatore:").grid(row=0, column=0, padx=5, pady=5)
@@ -302,8 +310,8 @@ class RigolTestApp(tk.Tk):
         self.controls_frame = ttk.Frame(parent)
         self.controls_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nsew")
 
-        self.controls_frame.grid_columnconfigure(0, weight=1)
-        self.controls_frame.grid_rowconfigure(1, weight=1)
+        # self.controls_frame.grid_columnconfigure(0, weight=1)
+        # self.controls_frame.grid_rowconfigure(1, weight=1)
 
         # Pulsanti Start/Stop
         button_frame = ttk.Frame(self.controls_frame)
@@ -362,18 +370,6 @@ class RigolTestApp(tk.Tk):
         self.urls.clear()
         self.refresh_address_table()
     
-    def retrieve_ip_list_from_config(self):
-        filepath = self.ip_addresses_config_path
-        filepath = os.path.join(os.getcwd(), filepath)
-        with open(filepath, mode="r", encoding="utf-8") as file:
-            csv_content = file.read()
-            data = url_list_from_csv(csv_content)
-            self.urls.update(data)
-            for entry in data:
-                self.log(f"[INFO] IP found: {entry}")
-            
-        self.refresh_address_table()
-
     def refresh_address_table(self):
         # Pulisce la Treeview
         for item in self.tree.get_children():
@@ -384,6 +380,7 @@ class RigolTestApp(tk.Tk):
         for ip in self.urls:
             self.detection_times[ip] = None
             self.tree.insert("", tk.END, iid=ip, values=(ip, ""), tags=('normal',))
+            self.log(f"[INFO] URL found: {ip}")
         
     def apply_time_settings(self):
         """
