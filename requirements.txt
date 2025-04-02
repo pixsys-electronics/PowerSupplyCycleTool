@@ -3,6 +3,7 @@ setuptools
 requests
 urllib3
 pyvisa
+pyvisa-py
 netifaces
 netaddr
 ordered-set
