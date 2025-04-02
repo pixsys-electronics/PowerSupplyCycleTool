@@ -14,6 +14,7 @@ import sys
 import json
 from ipaddress import IPv4Address, ip_address
 from ordered_set import OrderedSet
+import io
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -81,21 +82,10 @@ def config_from_json(file_path: str):
         data = json.load(file)
     return data
 
-# FIXME URL could be made in a different way
-def data_from_csv(file_path: str) -> OrderedSet[str]:
-    data: OrderedSet[str] = OrderedSet()
-    with open(file_path, mode='r') as file:
-        csv_reader = csv.DictReader(file, delimiter=';')
-        for row in csv_reader:
-            url = row['url']
-            addr = url.split(sep=':')[0]
-            print(addr)
-            try:
-                # make sure the address is valid
-                addr = IPv4Address(addr)
-                data.add(url)
-            except:
-                pass
+def url_list_from_csv(content: str) -> OrderedSet[str]:
+    csv_file = io.StringIO(content)
+    csv_reader = csv.DictReader(csv_file, delimiter=';')
+    data = OrderedSet([row['url'] for row in csv_reader])
     return data
 
 class RigolTestApp(tk.Tk):
@@ -154,13 +144,20 @@ class RigolTestApp(tk.Tk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)  # l'area log
 
-        self.init_psu_frame(self, 0, 0)
-        self.init_params_frame(self, 1, 0)
-        self.init_info_frame(self, 2, 0)
-        self.init_command_frame(self, 3, 0)
-        self.init_ip_table(self, 4, 0)
-        self.init_log_frame(self, 5, 0)
-        self.init_url_file_frame(self, 6, 0)
+        left_frame = tk.Frame(self)
+        left_frame.grid(row=0, column=0)
+
+        self.init_psu_frame(left_frame, 0, 0)
+        self.init_params_frame(left_frame, 1, 0)
+        self.init_info_frame(left_frame, 2, 0)
+        self.init_command_frame(left_frame, 3, 0)
+        self.init_ip_table(left_frame, 4, 0)
+        self.init_log_frame(left_frame, 5, 0)
+        
+        right_frame = tk.Frame(self)
+        right_frame.grid(row=0, column=1, sticky="new")
+        
+        self.init_url_file_frame(right_frame, 0, 0)
     
     def init_url_file_frame(self, parent, row, col):
         url_file_frame = ttk.Frame(parent)
@@ -168,11 +165,14 @@ class RigolTestApp(tk.Tk):
 
         self.url_file = scrolledtext.ScrolledText(url_file_frame)
         self.url_file.grid(row=0, column=0)
-        self.url_file.config(height=10)
+        self.url_file.config(height=20)
 
         url_list_path = os.path.join(os.getcwd(), self.ip_addresses_config_path)
         with open(url_list_path) as f: content = f.read()
         self.url_file.insert('1.0', content)
+
+        self.apply_button = ttk.Button(self.manual_frame, text="Apply", command=self.apply_url_file)
+        self.apply_button.grid(row=0, column=0, padx=5, pady=5)
     
     def init_info_frame(self, parent, row, col):
         # Frame 3: Info frame (timer, contatori)
@@ -304,7 +304,11 @@ class RigolTestApp(tk.Tk):
         self.log_text.config(height=10)
 
     
-    
+    def apply_url_file(self):
+        content = self.url_file.get("1.0", "end-1c")
+        self.urls = url_list_from_csv(content)
+        self.refresh_address_table()
+
     def ip_responds(self, ip):
         """Verifica se l'IP risponde utilizzando requests, usando la configurazione dell'URL."""
         protocol = "http" if self.verification_suffix.startswith(":80") else "https"
@@ -339,11 +343,13 @@ class RigolTestApp(tk.Tk):
     def retrieve_ip_list_from_config(self):
         filepath = self.ip_addresses_config_path
         filepath = os.path.join(os.getcwd(), filepath)
-        data = data_from_csv(filepath)
-        self.urls.update(data)
-        for entry in data:
-            self.log(f"[INFO] IP found: {entry}")
-        
+        with open(filepath, mode="r", encoding="utf-8") as file:
+            csv_content = file.read()
+            data = url_list_from_csv(csv_content)
+            self.urls.update(data)
+            for entry in data:
+                self.log(f"[INFO] IP found: {entry}")
+            
         self.refresh_address_table()
 
     def refresh_address_table(self):
