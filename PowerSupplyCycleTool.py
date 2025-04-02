@@ -99,6 +99,8 @@ def data_from_csv(file_path: str) -> OrderedSet[str]:
     return data
 
 class RigolTestApp(tk.Tk):
+    ip_addresses_config_path = 'config.csv'
+
     def __init__(self, config: TestBenchConfig):
         super().__init__()
         self.geometry("1280x800")
@@ -143,7 +145,6 @@ class RigolTestApp(tk.Tk):
         self.after(100, self.process_gui_queue)
 
         # TODO make this configurable from UI
-        self.ip_addresses_config_path = 'config.csv'
 
     def create_widgets(self):
         """
@@ -168,6 +169,10 @@ class RigolTestApp(tk.Tk):
         self.url_file = scrolledtext.ScrolledText(url_file_frame)
         self.url_file.grid(row=0, column=0)
         self.url_file.config(height=10)
+
+        url_list_path = os.path.join(os.getcwd(), self.ip_addresses_config_path)
+        with open(url_list_path) as f: content = f.read()
+        self.url_file.insert('1.0', content)
     
     def init_info_frame(self, parent, row, col):
         # Frame 3: Info frame (timer, contatori)
@@ -704,8 +709,5 @@ if __name__ == "__main__":
     config_path = sys.argv[1]
     config_path = os.path.join(os.getcwd(), config_path)
     config = TestBenchConfig.from_json(config_path)
-    url_list_path = os.path.join(os.getcwd(), "config.csv")
-    with open(url_list_path) as f: s = f.read()
-    print(s)
     app = RigolTestApp(config)
     app.mainloop()
