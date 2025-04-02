@@ -9,6 +9,7 @@
         "pre_check_delay": 30,
         "loop_check_period": 0.1,
         "poweroff_delay": 30,
-        "max_startup_delay": 5
+        "max_startup_delay": 5,
+        "cycle_start": 0
     }
 }
