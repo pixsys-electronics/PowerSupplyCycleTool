@@ -253,9 +253,13 @@ class RigolTestApp(tk.Tk):
         self.tree.tag_configure('error', foreground='red')
         self.tree.tag_configure('normal', foreground='black')
 
-        self.tree.pack(fill="x")
+        # Set fixed height (for example, 10 rows max visible)
+        self.tree.config(height=10)
 
-        # FIXME scrollbar is not working
+        # Pack Treeview with fill='y' so it adjusts to the height
+        self.tree.pack(side='left', fill='both', expand=True)
+
+        # Scrollbar
         vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         vsb.pack(side='right', fill='y')
 
@@ -375,9 +379,6 @@ class RigolTestApp(tk.Tk):
             self.detection_times[ip_str] = None
             self.tree.insert("", tk.END, iid=ip_str, values=(ip_str, ""), tags=('normal',))
         
-        rows_to_show = min(len(self.ip_addresses), 30)
-        self.tree.config(height=rows_to_show)
-
     def apply_time_settings(self):
         """
         Applica i tempi configurati dall'utente.
