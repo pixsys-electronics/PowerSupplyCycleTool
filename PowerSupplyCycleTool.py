@@ -133,8 +133,8 @@ class RigolTestApp(tk.Tk):
         self.after(500, self.process_log_queue)
         self.after(100, self.process_gui_queue)
 
-
-
+        # TODO make this configurable from UI
+        self.ip_addresses_config_path = 'config.csv'
 
     def create_widgets(self):
         """
@@ -320,9 +320,8 @@ class RigolTestApp(tk.Tk):
             self.log(f"[DEBUG] IP {ip} verifica fallita: {e}")
             return False
     
-    # FIXME path must be taken from an external var
     def retrieve_ip_list_from_config(self):
-        filepath = sys.argv[1]
+        filepath = self.ip_addresses_config_path
         filepath = os.path.join(os.getcwd(), filepath)
         data = data_from_csv(filepath)
         self.ip_addresses.update(data)
@@ -347,8 +346,6 @@ class RigolTestApp(tk.Tk):
             self.log("[ERRORE] IP Start deve essere <= IP End.")
             return
         
-        # Ricrea la lista degli IP
-        self.ip_addresses.clear()
         for ip_int in range(int(start_addr), int(end_addr) + 1):
             addr = ip_address(ip_int)
             self.ip_addresses.add(addr)
@@ -724,7 +721,7 @@ class RigolTestApp(tk.Tk):
 
 # Avvio dell'applicazione
 if __name__ == "__main__":
-    config_path = sys.argv[2]
+    config_path = sys.argv[1]
     config_path = os.path.join(os.getcwd(), config_path)
     config = TestBenchConfig.from_json(config_path)
     app = RigolTestApp(config)
