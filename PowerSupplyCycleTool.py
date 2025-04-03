@@ -102,7 +102,7 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
     return data
 
 class RigolTestApp(tk.Tk):
-    url_list_filename = 'config.csv'
+    url_list_filename = 'urls.csv'
     config_filename = 'config.json'
 
     def __init__(self):
