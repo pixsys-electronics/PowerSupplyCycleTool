@@ -1,15 +1,1 @@
-{
-    "connection":{
-        "psu_address": "192.168.60.96",
-        "start_address": "192.168.60.10",
-        "end_address": "192.168.60.21",
-        "url": ":9443"
-    },
-    "timing": {
-        "pre_check_delay": 30,
-        "loop_check_period": 0.1,
-        "poweroff_delay": 30,
-        "max_startup_delay": 5,
-        "cycle_start": 0
-    }
-}
+{"connection": {"psu_address": "192.168.60.96"}, "timing": {"pre_check_delay": 35.0, "loop_check_period": 0.8, "poweroff_delay": 55.0, "max_startup_delay": 5.5, "cycle_start": 4}}
