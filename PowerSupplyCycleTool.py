@@ -20,15 +20,14 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 class TestBenchConnectionConfig:
     psu_address: IPv4Address
-    start_address: IPv4Address
-    end_address: IPv4Address
-    url: str
 
-    def __init__(self, psu_address: IPv4Address, start_address: IPv4Address, end_address: IPv4Address, url: str):
+    def __init__(self, psu_address: IPv4Address):
         self.psu_address = psu_address
-        self.start_address = start_address
-        self.end_address = end_address
-        self.url = url
+    
+    def as_dict(self)->dict:
+        return {
+            "psu_address": str(self.psu_address)
+        }
 
 class TestBenchTimingConfig:
     pre_check_delay: float
@@ -43,6 +42,15 @@ class TestBenchTimingConfig:
         self.poweroff_delay = poweroff_delay
         self.max_startup_delay = max_startup_delay
         self.cycle_start = cycle_start
+    
+    def as_dict(self)->dict:
+        return {
+            "pre_check_delay": self.pre_check_delay,
+            "loop_check_period": self.loop_check_period,
+            "poweroff_delay": self.poweroff_delay,
+            "max_startup_delay": self.max_startup_delay,
+            "cycle_start": self.cycle_start
+        }
 
 
 class TestBenchConfig:
@@ -59,10 +67,7 @@ class TestBenchConfig:
         
         connection = data["connection"]
         psu_address = ip_address(connection["psu_address"])
-        start_address = ip_address(connection["start_address"])
-        end_address = ip_address(connection["end_address"])
-        url = connection["url"]
-        connection = TestBenchConnectionConfig(psu_address, start_address, end_address, url)
+        connection = TestBenchConnectionConfig(psu_address)
 
         timing = data["timing"]
         pre_check_delay = float(timing["pre_check_delay"])
@@ -75,6 +80,11 @@ class TestBenchConfig:
 
         return TestBenchConfig(connection, timing)
 
+    def as_dict(self) -> dict:
+        return {
+            "connection": self.connection.as_dict(),
+            "timing": self.timing.as_dict(),
+        }
 
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
@@ -92,17 +102,17 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
     return data
 
 class RigolTestApp(tk.Tk):
-    ip_addresses_config_path = 'config.csv'
+    url_list_filename = 'config.csv'
+    config_filename = 'config.json'
 
-    def __init__(self, config: TestBenchConfig):
+    def __init__(self):
         super().__init__()
         self.geometry("1280x800")
         self.title("Rigol Test GUI")
-        self.config: TestBenchConfig = config
         
-        # Stringa di verifica configurabile (viene impostata tramite GUI)
-        self.verification_suffix = self.config.connection.url
-        
+        config_path = os.path.join(os.getcwd(), self.config_filename)
+        self.config = TestBenchConfig.from_json(config_path)
+    
         # Lista IP e tempi di rilevamento
         self.urls: OrderedSet[str] = OrderedSet()
         self.detection_times = {}
@@ -196,7 +206,7 @@ class RigolTestApp(tk.Tk):
         self.url_file.grid(row=0, column=0)
         self.url_file.config(height=15)
 
-        url_list_path = os.path.join(os.getcwd(), self.ip_addresses_config_path)
+        url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path) as f: content = f.read()
         self.url_file.insert('1.0', content)
 
@@ -252,19 +262,19 @@ class RigolTestApp(tk.Tk):
             ("Intervallo tra controlli IP:", "entry_checkloop", self.config.timing.loop_check_period),
             ("Durata spegnimento:", "entry_speg", self.config.timing.poweroff_delay),
             ("Massimo ritardo avvio dispositivi:", "entry_maxdelay", self.config.timing.max_startup_delay),
-            ("Conteggio di partenza:", "entry_cycle_start", 0)
+            ("Conteggio di partenza:", "entry_cycle_start", self.config.timing.cycle_start)
         ]
 
         for idx, (label_text, entry_name, default_value) in enumerate(labels_entries):
             ttk.Label(self.times_frame, text=label_text).grid(row=idx, column=0, sticky="w", padx=5, pady=2)
             entry_var = tk.StringVar()
+            entry_var.set(default_value)
             callback_name = f"on_{entry_name}_change"
             callback = getattr(self, callback_name)
             entry_var.trace_add("write", callback)
 
             setattr(self, f"{entry_name}_var", entry_var)
             entry = ttk.Entry(self.times_frame, width=6, textvariable=entry_var)
-            entry.insert(0, str(default_value))
             entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             setattr(self, entry_name, entry)
     
@@ -274,6 +284,7 @@ class RigolTestApp(tk.Tk):
             try:
                 value = float(self.entry_precheck_var.get())
                 self.config.timing.pre_check_delay = value
+                self.save_config()
             except:
                 pass
     
@@ -282,6 +293,7 @@ class RigolTestApp(tk.Tk):
             try:
                 value = float(self.entry_checkloop_var.get())
                 self.config.timing.loop_check_period = value
+                self.save_config()
             except:
                 pass
 
@@ -290,6 +302,7 @@ class RigolTestApp(tk.Tk):
             try:
                 value = float(self.entry_speg_var.get())
                 self.config.timing.poweroff_delay = value
+                self.save_config()
             except:
                 pass
     
@@ -298,6 +311,7 @@ class RigolTestApp(tk.Tk):
             try:
                 value = int(self.entry_cycle_start_var.get())
                 self.config.timing.cycle_start = value
+                self.save_config()
             except:
                 pass
     
@@ -306,8 +320,16 @@ class RigolTestApp(tk.Tk):
             try:
                 value = float(self.entry_maxdelay_var.get())
                 self.config.timing.max_startup_delay = value
+                self.save_config()
             except:
                 pass
+    
+    def save_config(self):
+        config_path = os.path.join(os.getcwd(), self.config_filename)
+        data = self.config.as_dict()
+        data_json = json.dumps(data)
+        with open(config_path, mode="w", encoding="utf-8") as file:
+            file.write(data_json)
     
     def init_psu_frame(self, parent, row, col):
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
@@ -369,20 +391,9 @@ class RigolTestApp(tk.Tk):
         self.urls = url_list_from_csv(content)
         self.refresh_address_table()
         
-        url_list_path = os.path.join(os.getcwd(), self.ip_addresses_config_path)
+        url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path, mode="w", encoding="utf-8") as file:
             file.write(content)
-
-    def ip_responds(self, ip):
-        """Verifica se l'IP risponde utilizzando requests, usando la configurazione dell'URL."""
-        protocol = "http" if self.verification_suffix.startswith(":80") else "https"
-        url = f"{protocol}://{ip}{self.verification_suffix}"
-        try:
-            response = requests.get(url, verify=False, timeout=3)
-            return response.status_code == 200
-        except requests.RequestException as e:
-            self.log(f"[DEBUG] IP {ip} non risponde: {e}")
-            return False
 
     def ip_responds_curl(self, url: str):
         try:
@@ -751,8 +762,5 @@ class RigolTestApp(tk.Tk):
 
 # Avvio dell'applicazione
 if __name__ == "__main__":
-    config_path = sys.argv[1]
-    config_path = os.path.join(os.getcwd(), config_path)
-    config = TestBenchConfig.from_json(config_path)
-    app = RigolTestApp(config)
+    app = RigolTestApp()
     app.mainloop()
