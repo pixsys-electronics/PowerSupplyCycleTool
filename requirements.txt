@@ -7,3 +7,4 @@ pyvisa-py
 netifaces
 netaddr
 ordered-set
+gitpython

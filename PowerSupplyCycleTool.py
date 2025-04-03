@@ -15,6 +15,7 @@ import json
 from ipaddress import IPv4Address, ip_address
 from ordered_set import OrderedSet
 import io
+import git
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -89,6 +90,11 @@ class TestBenchConfig:
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
 
+def get_current_git_commit_hash():
+    repo = git.Repo(os.getcwd())
+    sha = repo.head.object.hexsha
+    return sha
+
 def config_from_json(file_path: str):
     data = {}
     with open(file_path, 'r') as file:
@@ -104,11 +110,14 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
 class RigolTestApp(tk.Tk):
     url_list_filename = 'urls.csv'
     config_filename = 'config.json'
+    window_title = "Rigol Test GUI"
+    window_w = 1280
+    window_h = 800
 
-    def __init__(self):
+    def __init__(self, version):
         super().__init__()
-        self.geometry("1280x800")
-        self.title("Rigol Test GUI")
+        self.geometry(f"{self.window_w}x{self.window_h}")
+        self.title(f"{self.window_title} (commit {version})")
         
         config_path = os.path.join(os.getcwd(), self.config_filename)
         self.config = TestBenchConfig.from_json(config_path)
@@ -762,5 +771,6 @@ class RigolTestApp(tk.Tk):
 
 # Avvio dell'applicazione
 if __name__ == "__main__":
-    app = RigolTestApp()
+    version =  get_current_git_commit_hash()
+    app = RigolTestApp(version)
     app.mainloop()
