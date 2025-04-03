@@ -271,23 +271,43 @@ class RigolTestApp(tk.Tk):
     # TODO each _var is created inside the loop right above here. Please declare them as class properties
     def on_entry_precheck_change(self, *args):
         if hasattr(self, "entry_precheck_var"):
-            self.config.timing.pre_check_delay = self.entry_precheck_var.get()
-
+            try:
+                value = float(self.entry_precheck_var.get())
+                self.config.timing.pre_check_delay = value
+            except:
+                pass
+    
     def on_entry_checkloop_change(self, *args):
         if hasattr(self, "entry_checkloop_var"):
-            self.config.timing.loop_check_period = self.entry_checkloop_var.get()
+            try:
+                value = float(self.entry_checkloop_var.get())
+                self.config.timing.loop_check_period = value
+            except:
+                pass
 
     def on_entry_speg_change(self, *args):
         if hasattr(self, "entry_speg_var"):
-            self.config.timing.poweroff_delay = self.entry_speg_var.get()
+            try:
+                value = float(self.entry_speg_var.get())
+                self.config.timing.poweroff_delay = value
+            except:
+                pass
     
     def on_entry_cycle_start_change(self, *args):
         if hasattr(self, "entry_cycle_start_var"):
-            self.config.timing.cycle_start = self.entry_cycle_start_var.get()
+            try:
+                value = int(self.entry_cycle_start_var.get())
+                self.config.timing.cycle_start = value
+            except:
+                pass
     
     def on_entry_maxdelay_change(self, *args):
         if hasattr(self, "entry_maxdelay_var"):
-            self.config.timing.max_startup_delay = self.entry_maxdelay_var.get()
+            try:
+                value = float(self.entry_maxdelay_var.get())
+                self.config.timing.max_startup_delay = value
+            except:
+                pass
     
     def init_psu_frame(self, parent, row, col):
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
