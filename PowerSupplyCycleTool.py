@@ -1,3 +1,4 @@
+import socket
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import threading
@@ -16,6 +17,7 @@ from ipaddress import IPv4Address, ip_address
 from ordered_set import OrderedSet
 import io
 import git
+from paramiko import AuthenticationException, BadHostKeyException, SSHClient, SSHException
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -107,6 +109,23 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
     data = OrderedSet([row['url'] for row in csv_reader])
     return data
 
+def run_ssh_command(server: str, username: str, password: str, command: str):
+    try:
+        ssh = SSHClient()
+        ssh.connect(server, username=username, password=password)
+        ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(command)
+    except BadHostKeyException as e:
+        print(f"Bad host key: {e}")
+    except AuthenticationException as e:
+        print(f"Authentication exception: {e}")
+    except socket.error as e:
+        print(f"socket error: {e}")
+    except SSHException as e:
+        print(f"SSH exception: {e}")
+    except:
+        print("Generic error")
+    
+
 class RigolTestApp(tk.Tk):
     url_list_filename = 'urls.csv'
     config_filename = 'config.json'
@@ -146,6 +165,8 @@ class RigolTestApp(tk.Tk):
         # Flag per capire se lo stop è stato manuale
         self.test_stopped_intentionally = False
         
+        self.ssh_enabled = False
+        
         # Creazione interfaccia grafica
         self.create_widgets()
         
@@ -178,6 +199,7 @@ class RigolTestApp(tk.Tk):
 
         self.init_psu_frame(top_left_frame, 0, 0)
         self.init_params_frame(top_left_frame, 1, 0)
+        self.init_ssh_frame(top_left_frame, 2, 0)
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
@@ -286,6 +308,31 @@ class RigolTestApp(tk.Tk):
             entry = ttk.Entry(self.times_frame, width=6, textvariable=entry_var)
             entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             setattr(self, entry_name, entry)
+    
+    def init_ssh_frame(self, parent, row, col):
+        self.ssh_frame = ttk.LabelFrame(parent, text="SSH")
+        self.ssh_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
+        
+        c1 = tk.Checkbutton(self.ssh_frame, text='Run SSH command on power-off',variable=self.ssh_enabled, onvalue=True, offvalue=False)
+        c1.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
+        
+        ttk.Label(self.ssh_frame, text="Username").grid(row=row+1, column=col, sticky="w", padx=5, pady=2)
+        username_var = tk.StringVar()
+        username_var.set("")
+        username = ttk.Entry(self.ssh_frame, width=20, textvariable=username_var)
+        username.grid(row=row+1, column=col+1, padx=10, pady=5, sticky="nw")
+        
+        ttk.Label(self.ssh_frame, text="Password").grid(row=row+2, column=col, sticky="w", padx=5, pady=2)
+        password_var = tk.StringVar()
+        password_var.set("")
+        password = ttk.Entry(self.ssh_frame, width=20, textvariable=password_var)
+        password.grid(row=row+2, column=col+1, padx=10, pady=5, sticky="nw")
+        
+        ttk.Label(self.ssh_frame, text="Command").grid(row=row+3, column=col, sticky="w", padx=5, pady=2)
+        command_var = tk.StringVar()
+        command_var.set("")
+        command = ttk.Entry(self.ssh_frame, width=20, textvariable=command_var)
+        command.grid(row=row+3, column=col+1, padx=10, pady=5, sticky="nw")
     
     # TODO each _var is created inside the loop right above here. Please declare them as class properties
     def on_entry_precheck_change(self, *args):
