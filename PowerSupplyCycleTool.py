@@ -172,6 +172,8 @@ class RigolTestApp(tk.Tk):
         
         config_path = os.path.join(os.getcwd(), self.config_filename)
         self.config = TestBenchConfig.from_json(config_path)
+        
+        self.alimentatore = dp832()
     
         # Lista IP e tempi di rilevamento
         self.urls: OrderedSet[str] = OrderedSet()
@@ -188,7 +190,6 @@ class RigolTestApp(tk.Tk):
         
         # Contatori
         self.cycle_count = 0
-        self.cycle_start_count = 0
         self.anomaly_count = 0
         
         # File di report
@@ -501,8 +502,9 @@ class RigolTestApp(tk.Tk):
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path, mode="w", encoding="utf-8") as file:
             file.write(content)
-
-    def ip_responds_curl(self, url: str):
+            
+    # check if a given url returns HTTP code 200 (success) using curl
+    def ip_responds_curl(self, url: str) -> bool:
         try:
             result = subprocess.run(
                 ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
@@ -575,13 +577,9 @@ class RigolTestApp(tk.Tk):
 
     def make_report_filename(self):
         """Genera un nome file per il report basato sulla data e ora corrente."""
-        try:
-            now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"report_{now_str}.csv"
-            return filename
-        except Exception as e:
-            self.log(f"[ERRORE] Errore nella creazione del nome del report: {str(e)}")
-            return None
+        now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"report_{now_str}.csv"
+        return filename
 
     def write_test_start_line(self):
         """Scrive una riga di intestazione nel file di report per l'inizio del test."""
@@ -595,7 +593,106 @@ class RigolTestApp(tk.Tk):
                 f.write(line)
         except Exception as e:
             self.log(f"[ERRORE] Errore durante la scrittura del file di report: {str(e)}")
+            
+    def perform_test_cycle(self):
+        t0 = None
+        cycle_defectives = set()
+        
+        self.cycle_count += 1
+        self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
+            
+        
+        self.log(f"[INFO] (Ciclo {self.cycle_count}) Accendo alimentatore (canali 1 e 2)...")
+        try:
+            self.psu_poweron()
+        except Exception as e:
+            self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
+            return
+        
+        self.log(f"[INFO] Attendo {self.config.timing.pre_check_delay} secondi prima del controllo degli IP.")
+        if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
+            return
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            # run a different thread for each URL to ping 
+            future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
+            
+            # wait until every thread has finished, then iterate over each response and check it
+            for future in concurrent.futures.as_completed(future_to_ip):
+                ip = future_to_ip[future]
+                try:
+                    response = future.result()
+                except Exception as exc:
+                    self.log(f"[ERRORE] Verifica IP {ip} ha generato un'eccezione: {exc}")
+                    continue
+                else:
+                    # if the response is false (either an invalid HTTP response or a timeout), check the next future
+                    if not response:
+                        continue
+                    self.detection_times[ip] = datetime.datetime.now()
+                    detected_time_str = self.detection_times[ip].strftime("%H:%M:%S.%f")[:-3]
+                    self.gui_queue.put(('update_tree', ip, detected_time_str))
+                    self.log(f"[INFO] IP {ip} rilevato alle {detected_time_str}")
+                    # if it's the first URL to answer, save the timestamp as time reference
+                    if t0 is None:
+                        t0 = self.detection_times[ip]
+                    # otherwise compute the time difference between the current timestamp and the reference one, in seconds
+                    else:
+                        elapsed_since_t0 = (self.detection_times[ip] - t0).total_seconds()
+                        # if the time difference is smaller than the max startup delay, wait for the next response
+                        if elapsed_since_t0 <= self.config.timing.max_startup_delay:
+                            continue
+                        # otherwise if the time difference is greater, flag it as anomaly
+                        if ip not in cycle_defectives:
+                            self.log(f"[ALLARME] IP {ip} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
+                            self.anomaly_count += 1
+                            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+                            cycle_defectives.add(ip)
+        
+        # if every URL has answered sort the detection times and save it inside the report
+        if all(self.detection_times[ip] is not None for ip in self.urls):
+            self.log("[INFO] Tutti gli IP hanno risposto.")
+            detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
+            ip_first, t_first = detection_sorted[0]
+            ip_last, t_last = detection_sorted[-1]
+            delay = (t_last - t_first).total_seconds()
+            self.save_cycle_report(ip_first, ip_last, delay)
+            return
+        
+        # finally check who didn't responded within max_startup_delay
+        non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
+        for ip in non_rilevati:
+            self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
+            self.gui_queue.put(('highlight_error', ip))
+            self.anomaly_count += 1
+            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+            cycle_defectives.add(ip)
+        
+        if not self.wait_with_stop_check(5):
+            return
 
+        self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
+        try:
+            self.psu_poweroff()
+        except Exception as e:
+            self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
+            return
+        
+        self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
+        if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
+            return
+    
+    def psu_poweroff(self):
+        self.psu_set_state('OFF')
+    
+    def psu_poweron(self):
+        self.psu_set_state('ON')
+    
+    def psu_set_state(self, state: str):
+        for channel in (1, 2):
+            self.alimentatore.select_output(channel)
+            self.alimentatore.toggle_output(channel, state)
+    
     def test_loop(self):
         """
         Loop principale di test:
@@ -779,15 +876,10 @@ class RigolTestApp(tk.Tk):
             self.test_start_time = time.time()
             self.update_elapsed_time()
             self.test_stopped_intentionally = False
-            try:
-                self.cycle_start_count = int(self.entry_cycle_start.get())
-            except ValueError:
-                self.cycle_start_count = 0
-                self.log("[ERRORE] Conteggio di partenza non valido. Impostato a 0.")
-            self.cycle_count = self.cycle_start_count
+            self.cycle_count = self.config.timing.cycle_start
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
             self.anomaly_count = 0
-            self.gui_queue.put(('update_label', 'anomaly_count_label', "Accensioni con anomalia: 0"))
+            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             self.report_file = self.make_report_filename()
             if self.report_file:
                 self.write_test_start_line()
