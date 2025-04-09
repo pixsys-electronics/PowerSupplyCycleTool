@@ -1,6 +1,6 @@
 import socket
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import BooleanVar, IntVar, ttk, scrolledtext
 import threading
 import time
 import datetime
@@ -32,6 +32,26 @@ class TestBenchConnectionConfig:
             "psu_address": str(self.psu_address)
         }
 
+class TestBenchSSHConfig:
+    username: str
+    password: str
+    command: str
+    enabled: bool
+
+    def __init__(self, username: str, password: str, command: str, enabled: bool):
+        self.username = username
+        self.password = password
+        self.command = command
+        self.enabled = enabled
+    
+    def as_dict(self)->dict:
+        return {
+            "username": str(self.username),
+            "password": str(self.password),
+            "command": str(self.command),
+            "enabled": str(self.enabled),
+        }
+
 class TestBenchTimingConfig:
     pre_check_delay: float
     loop_check_period: float
@@ -59,10 +79,12 @@ class TestBenchTimingConfig:
 class TestBenchConfig:
     connection: TestBenchConnectionConfig
     timing: TestBenchTimingConfig
+    ssh: TestBenchSSHConfig
 
-    def __init__(self, connection: TestBenchConnectionConfig, timing: TestBenchTimingConfig):
+    def __init__(self, connection: TestBenchConnectionConfig, timing: TestBenchTimingConfig, ssh: TestBenchSSHConfig):
         self.connection = connection
         self.timing = timing
+        self.ssh = ssh
     
     @staticmethod
     def from_json(file_path: str):
@@ -79,14 +101,24 @@ class TestBenchConfig:
         max_startup_delay = float(timing["max_startup_delay"])
         cycle_start = int(timing["cycle_start"])
     
-        timing = TestBenchTimingConfig(pre_check_delay, loop_check_period, poweroff_delay, max_startup_delay, cycle_start)
+        timing = TestBenchTimingConfig(pre_check_delay, loop_check_period, poweroff_delay, max_startup_delay, cycle_start)\
+            
+        ssh = data["ssh"]
+        username = ssh["username"]
+        password = ssh["password"]
+        command = ssh["command"]
+        # it sucks but it's convenient
+        enabled = ssh["enabled"] == "True"
+        
+        ssh = TestBenchSSHConfig(username, password, command, enabled)
 
-        return TestBenchConfig(connection, timing)
+        return TestBenchConfig(connection, timing, ssh)
 
     def as_dict(self) -> dict:
         return {
             "connection": self.connection.as_dict(),
             "timing": self.timing.as_dict(),
+            "ssh": self.ssh.as_dict()
         }
 
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
@@ -164,8 +196,6 @@ class RigolTestApp(tk.Tk):
         
         # Flag per capire se lo stop è stato manuale
         self.test_stopped_intentionally = False
-        
-        self.ssh_enabled = False
         
         # Creazione interfaccia grafica
         self.create_widgets()
@@ -313,26 +343,47 @@ class RigolTestApp(tk.Tk):
         self.ssh_frame = ttk.LabelFrame(parent, text="SSH")
         self.ssh_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
         
-        c1 = tk.Checkbutton(self.ssh_frame, text='Run SSH command on power-off',variable=self.ssh_enabled, onvalue=True, offvalue=False)
+        self.chkValue = IntVar(master = self.ssh_frame, value=self.config.ssh.enabled)
+        
+        c1 = tk.Checkbutton(self.ssh_frame, text='Run SSH command on power-off',variable=self.chkValue, command=self.on_checkbutton_toggle)
         c1.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
         
         ttk.Label(self.ssh_frame, text="Username").grid(row=row+1, column=col, sticky="w", padx=5, pady=2)
-        username_var = tk.StringVar()
-        username_var.set("")
-        username = ttk.Entry(self.ssh_frame, width=20, textvariable=username_var)
+        self.username_var = tk.StringVar()
+        self.username_var.set(self.config.ssh.username)
+        self.username_var.trace_add("write", self.on_username_change)
+        username = ttk.Entry(self.ssh_frame, width=20, textvariable=self.username_var)
         username.grid(row=row+1, column=col+1, padx=10, pady=5, sticky="nw")
         
         ttk.Label(self.ssh_frame, text="Password").grid(row=row+2, column=col, sticky="w", padx=5, pady=2)
-        password_var = tk.StringVar()
-        password_var.set("")
-        password = ttk.Entry(self.ssh_frame, width=20, textvariable=password_var)
+        self.password_var = tk.StringVar()
+        self.password_var.set(self.config.ssh.password)
+        self.password_var.trace_add("write", self.on_password_change)
+        password = ttk.Entry(self.ssh_frame, width=20, textvariable=self.password_var)
         password.grid(row=row+2, column=col+1, padx=10, pady=5, sticky="nw")
         
         ttk.Label(self.ssh_frame, text="Command").grid(row=row+3, column=col, sticky="w", padx=5, pady=2)
-        command_var = tk.StringVar()
-        command_var.set("")
-        command = ttk.Entry(self.ssh_frame, width=20, textvariable=command_var)
+        self.command_var = tk.StringVar()
+        self.command_var.set(self.config.ssh.command)
+        command = ttk.Entry(self.ssh_frame, width=20, textvariable=self.command_var)
+        self.command_var.trace_add("write", self.on_command_change)
         command.grid(row=row+3, column=col+1, padx=10, pady=5, sticky="nw")
+    
+    def on_checkbutton_toggle(self, *args):
+        self.config.ssh.enabled = not self.config.ssh.enabled
+        self.save_config()
+    
+    def on_username_change(self, *args):
+        self.config.ssh.username = self.username_var.get()
+        self.save_config()
+    
+    def on_password_change(self, *args):
+        self.config.ssh.password = self.password_var.get()
+        self.save_config()
+    
+    def on_command_change(self, *args):
+        self.config.ssh.command = self.command_var.get()
+        self.save_config()
     
     # TODO each _var is created inside the loop right above here. Please declare them as class properties
     def on_entry_precheck_change(self, *args):
