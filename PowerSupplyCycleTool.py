@@ -613,6 +613,7 @@ class RigolTestApp(tk.Tk):
         if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
             return
         
+        # TODO do this until self.detection_times[ip] has every response or until max_startup_delay has passed
         with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
             # run a different thread for each URL to ping 
             future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
