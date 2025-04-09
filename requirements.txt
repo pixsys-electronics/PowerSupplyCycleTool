@@ -8,3 +8,4 @@ netifaces
 netaddr
 ordered-set
 gitpython
+paramiko

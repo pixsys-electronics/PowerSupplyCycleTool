@@ -14,6 +14,5 @@ pip install -r requirements.txt
 
 ## Run
 ```sh
-# python PowerSupplyCycleTool.py <address_csv> <config_json>
-python PowerSupplyCycleTool.py config.csv config.json
+python PowerSupplyCycleTool.py
 ```
