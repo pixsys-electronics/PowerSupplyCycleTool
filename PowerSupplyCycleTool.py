@@ -645,8 +645,9 @@ class RigolTestApp(tk.Tk):
                 detection_times[url] = datetime.datetime.now()
         
         return detection_times
-            
-    def ping(self):
+    
+    # returns True every url of the urls list has answered, otherwise it returns False
+    def ping(self) -> bool:
         # ping only the URLs that havent' answered yet and save their detection times
         url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is None])
         detection_times = self.ping_with_detection_time(url_list_to_ping)
@@ -714,6 +715,7 @@ class RigolTestApp(tk.Tk):
         - Utilizza la stringa configurabile per costruire l'URL di verifica.
         """
         
+        # connect to the PSU
         self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
         try:
             self.psu_init()
@@ -722,104 +724,39 @@ class RigolTestApp(tk.Tk):
             self.run_test = False
             return
         
-        while self.run_test:
+        # start the main loop
+        while self.wait_with_stop_check(self.config.timing.loop_check_period):
             # Gestione pausa
-            while hasattr(self, 'is_paused') and self.is_paused and self.run_test:
-                time.sleep(0.5)
+            if self.is_paused:
                 continue
-
-            if not self.run_test:
-                break
 
             self.cycle_count += 1
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
             
-            current_cycle_defectives = set()
-            
             self.log(f"[INFO] (Ciclo {self.cycle_count}) Accendo alimentatore (canali 1 e 2)...")
             try:
-                for channel in (1, 2):
-                    alimentatore.select_output(channel)
-                    alimentatore.toggle_output(channel, 'ON')
+                self.psu_poweron()
             except Exception as e:
                 self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
                 continue
             
+            # clear detection times and GUI
             for ip in self.urls:
                 self.detection_times[ip] = None
                 self.gui_queue.put(('update_tree', ip, ""))
                 self.gui_queue.put(('remove_tag', ip))
             
+            # wait for precheck delay
             self.log(f"[INFO] Attendo {self.config.timing.pre_check_delay} secondi prima del controllo degli IP.")
             if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
                 break
-
-            t0 = None
+            
+            # start the pinging loop
+            # it exits if the ping is successfull (every URL has answered)
             self.log("[INFO] Inizio controllo rapido degli IP ogni 100ms.")
-            while self.run_test:
-                # Gestione pausa
-                while hasattr(self, 'is_paused') and self.is_paused and self.run_test:
-                    time.sleep(0.5)
-                    continue
-                
-                if not self.run_test:
+            while self.wait_with_stop_check(self.config.timing.loop_check_period):
+                if self.ping():
                     break
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                    future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
-                    
-                    for future in concurrent.futures.as_completed(future_to_ip):
-                        ip = future_to_ip[future]
-                        try:
-                            response = future.result()
-                        except Exception as exc:
-                            self.log(f"[ERRORE] Verifica IP {ip} ha generato un'eccezione: {exc}")
-                            continue
-                        else:
-                            if response:
-                                detection_time = datetime.datetime.now()
-                                self.detection_times[ip] = detection_time
-                                detected_time_str = detection_time.strftime("%H:%M:%S.%f")[:-3]
-                                self.gui_queue.put(('update_tree', ip, detected_time_str))
-                                self.log(f"[INFO] IP {ip} rilevato alle {detected_time_str}")
-                                if t0 is None:
-                                    t0 = detection_time
-                                else:
-                                    elapsed_since_t0 = (detection_time - t0).total_seconds()
-                                    if elapsed_since_t0 > self.config.timing.max_startup_delay:
-                                        if ip not in current_cycle_defectives:
-                                            self.log(f"[ALLARME] IP {ip} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
-                                            self.anomaly_count += 1
-                                            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-                                            current_cycle_defectives.add(ip)
-            
-                if all(self.detection_times[ip] is not None for ip in self.urls):
-                    self.log("[INFO] Tutti gli IP hanno risposto.")
-                    detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
-                    ip_first, t_first = detection_sorted[0]
-                    ip_last, t_last = detection_sorted[-1]
-                    delay = (t_last - t_first).total_seconds()
-                    self.save_cycle_report(ip_first, ip_last, delay)
-                    break
-
-                if t0:
-                    elapsed_since_t0 = (datetime.datetime.now() - t0).total_seconds()
-                    if elapsed_since_t0 > self.config.timing.max_startup_delay:
-                        non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
-                        if non_rilevati:
-                            for ip in non_rilevati:
-                                if ip not in current_cycle_defectives:
-                                    self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
-                                    self.gui_queue.put(('highlight_error', ip))
-                                    self.anomaly_count += 1
-                                    self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-                                    current_cycle_defectives.add(ip)
-            
-                if not self.wait_with_stop_check(self.config.timing.loop_check_period):
-                    break
-
-            if not self.run_test:
-                break
 
             self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
             if not self.wait_with_stop_check(5):
@@ -827,9 +764,7 @@ class RigolTestApp(tk.Tk):
 
             self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
             try:
-                for channel in (1, 2):
-                    alimentatore.select_output(channel)
-                    alimentatore.toggle_output(channel, 'OFF')
+                self.psu_poweroff()
                 self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
                 if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
                     break
@@ -840,9 +775,7 @@ class RigolTestApp(tk.Tk):
         if not self.test_stopped_intentionally:
             self.log("[INFO] Spegnimento finale dell'alimentatore...")
             try:
-                for channel in (1, 2):
-                    alimentatore.select_output(channel)
-                    alimentatore.toggle_output(channel, 'OFF')
+                self.psu_poweroff()
                 self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento finale...")
                 time.sleep(self.config.timing.poweroff_delay)
             except Exception as e:
