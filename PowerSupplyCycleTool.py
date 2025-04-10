@@ -746,19 +746,24 @@ class RigolTestApp(tk.Tk):
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
                 if not self.wait_with_stop_check(5):
                     break
-                try:
-                    ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command()
-                    # ssh_stdout._r
-                except BadHostKeyException as e:
-                    self.log(f"[ERROR] Bad host key: {e}")
-                except AuthenticationException as e:
-                    self.log(f"[ERROR] Authentication exception: {e}")
-                except socket.error as e:
-                    self.log(f"[ERROR] socket error: {e}")
-                except SSHException as e:
-                    self.log(f"[ERROR] SSH exception: {e}")
-                except Exception as e:
-                    self.log(f"[ERROR] Generic error: {e}")
+                for url in self.urls:
+                    try:
+                        ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command(
+                            url,
+                            self.config.ssh.username,
+                            self.config.ssh.password,
+                            self.config.ssh.command
+                        )
+                    except BadHostKeyException as e:
+                        self.log(f"[ERROR] Bad host key: {e}")
+                    except AuthenticationException as e:
+                        self.log(f"[ERROR] Authentication exception: {e}")
+                    except socket.error as e:
+                        self.log(f"[ERROR] socket error: {e}")
+                    except SSHException as e:
+                        self.log(f"[ERROR] SSH exception: {e}")
+                    except Exception as e:
+                        self.log(f"[ERROR] Generic error: {e}")
             
             else:    
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
