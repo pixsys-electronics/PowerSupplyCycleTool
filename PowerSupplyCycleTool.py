@@ -612,8 +612,10 @@ class RigolTestApp(tk.Tk):
             try:
                 response = future.result()
             except subprocess.TimeoutExpired:
+                response = None
                 self.log(f"[ERRORE] {url} non ha risposto al ping")
             except Exception as exc:
+                response = None
                 self.log(f"[ERRORE] Verifica IP {url} ha generato un'eccezione: {exc}")
         
             detection_times[url] = response
