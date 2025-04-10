@@ -690,9 +690,11 @@ class RigolTestApp(tk.Tk):
             self.anomaly_count += 1
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             self.cycle_defectives.add(ip)
-        
+    
+    def psu_connect(self):
+        self.alimentatore.connect(self.config.connection.psu_address)        
+    
     def psu_init(self):
-        self.alimentatore.connect(self.config.connection.psu_address)
         self.alimentatore.set_voltage(1, 26.000)
         self.alimentatore.set_voltage(2, 26.000)
     
@@ -718,6 +720,7 @@ class RigolTestApp(tk.Tk):
         # connect to the PSU
         self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
         try:
+            self.psu_connect()
             self.psu_init()
         except Exception as e:
             self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
@@ -860,15 +863,10 @@ class RigolTestApp(tk.Tk):
     def force_power_on(self):
         """Forza manualmente l'accensione dell'alimentatore."""
         try:
-            if not self.config.connection.psu_address:
-                self.log("[ERRORE] IP alimentatore non configurato!")
-                return
-            alimentatore = dp832()
             self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
-            alimentatore.connect(self.config.connection.psu_address)
-            for channel in (1, 2):
-                alimentatore.select_output(channel)
-                alimentatore.toggle_output(channel, 'ON')
+            self.psu_connect()
+            self.psu_init()
+            self.psu_poweron()
             self.log("[INFO] Alimentatore forzato su ON.")
         except Exception as e:
             self.log(f"[ERRORE] Errore durante l'accensione forzata: {str(e)}")
@@ -876,15 +874,9 @@ class RigolTestApp(tk.Tk):
     def force_power_off(self):
         """Forza manualmente lo spegnimento dell'alimentatore."""
         try:
-            if not self.config.connection.psu_address:
-                self.log("[ERRORE] IP alimentatore non configurato!")
-                return
-            alimentatore = dp832()
             self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
-            alimentatore.connect(self.config.connection.psu_address)
-            for channel in (1, 2):
-                alimentatore.select_output(channel)
-                alimentatore.toggle_output(channel, 'OFF')
+            self.psu_connect()
+            self.psu_poweroff()
             self.log("[INFO] Alimentatore forzato su OFF.")
         except Exception as e:
             self.log(f"[ERRORE] Errore durante lo spegnimento forzato: {str(e)}")
