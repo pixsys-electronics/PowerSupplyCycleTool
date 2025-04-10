@@ -606,13 +606,13 @@ class RigolTestApp(tk.Tk):
         detection_times: dict[str, (datetime.datetime | None)] = dict()
         url_futures = ping(url_list)
         
-        response = False
+        response = None
         
         for url,future in url_futures.items():
             try:
                 response = future.result()
             except subprocess.TimeoutExpired:
-                self.log(f"[ERRORE] {url} non ha risposto in tempo")
+                self.log(f"[ERRORE] {url} non ha risposto al ping")
             except Exception as exc:
                 self.log(f"[ERRORE] Verifica IP {url} ha generato un'eccezione: {exc}")
         
@@ -648,7 +648,6 @@ class RigolTestApp(tk.Tk):
         
         # if every URL has answered, generate the report file and exit
         if all(self.detection_times[ip] is not None for ip in self.urls):
-            self.log("[INFO] Tutti gli IP hanno risposto.")
             detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
             ip_first, t_first = detection_sorted[0]
             ip_last, t_last = detection_sorted[-1]
