@@ -753,8 +753,10 @@ class RigolTestApp(tk.Tk):
             
             # start the pinging loop
             # it exits if the ping is successfull (every URL has answered)
-            self.log("[INFO] Inizio controllo rapido degli IP ogni 100ms.")
+            self.log(f"[INFO] Inizio controllo rapido degli IP ogni {self.config.timing.loop_check_period}s.")
             while self.wait_with_stop_check(self.config.timing.loop_check_period):
+                if self.is_paused:
+                    continue
                 if self.ping():
                     break
 
@@ -808,6 +810,8 @@ class RigolTestApp(tk.Tk):
         if not self.run_test:
             self.run_test = True
             self.is_paused = False
+            self.cycle_defectives.clear()
+            self.t0 = None
             self.pause_status_label.configure(text="Stato: In esecuzione")
             self.pause_button.configure(text="Pausa")
             self.log("[INFO] Test avviato.")
@@ -843,9 +847,6 @@ class RigolTestApp(tk.Tk):
             self.after(1000, self.update_elapsed_time)
 
     def toggle_pause(self):
-        """Mette in pausa o riprende il test."""
-        if not hasattr(self, 'is_paused'):
-            self.is_paused = False
         self.is_paused = not self.is_paused
         if self.is_paused:
             self.pause_button.configure(text="Riprendi")
