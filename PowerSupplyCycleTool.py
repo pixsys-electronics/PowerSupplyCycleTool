@@ -761,6 +761,7 @@ class RigolTestApp(tk.Tk):
                     try:
                         ip = ip_from_url(url)
                         if ip is None:
+                            self.log(f"[ERROR] cannot retrieve IP from {url}")
                             continue
                         ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command(
                             str(ip),
