@@ -613,20 +613,27 @@ class RigolTestApp(tk.Tk):
         if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
             return
         
-        # TODO do this until self.detection_times[ip] has every response or until max_startup_delay has passed
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-            # run a different thread for each URL to ping 
-            future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
+        # try to ping every URL until the test is externally stopped or until every URL has answered
+        while self.wait_with_stop_check(self.config.timing.loop_check_period):
+            # if the test is paused, go to the next cycle and re-check 
+            if self.is_paused:
+                continue
             
-            # wait until every thread has finished, then iterate over each response and check it
-            for future in concurrent.futures.as_completed(future_to_ip):
-                ip = future_to_ip[future]
-                try:
-                    response = future.result()
-                except Exception as exc:
-                    self.log(f"[ERRORE] Verifica IP {ip} ha generato un'eccezione: {exc}")
-                    continue
-                else:
+            # spawn a bunch of workers to start the pinging process
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                # run a different thread for each URL to ping 
+                future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
+                
+                # wait until every thread has finished, then iterate over each response and check it
+                for future in concurrent.futures.as_completed(future_to_ip):
+                    ip = future_to_ip[future]
+                    
+                    try:
+                        response = future.result()
+                    except Exception as exc:
+                        self.log(f"[ERRORE] Verifica IP {ip} ha generato un'eccezione: {exc}")
+                        continue
+                    
                     # if the response is false (either an invalid HTTP response or a timeout), check the next future
                     if not response:
                         continue
@@ -650,24 +657,25 @@ class RigolTestApp(tk.Tk):
                             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
                             cycle_defectives.add(ip)
         
-        # if every URL has answered sort the detection times and save it inside the report
-        if all(self.detection_times[ip] is not None for ip in self.urls):
-            self.log("[INFO] Tutti gli IP hanno risposto.")
-            detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
-            ip_first, t_first = detection_sorted[0]
-            ip_last, t_last = detection_sorted[-1]
-            delay = (t_last - t_first).total_seconds()
-            self.save_cycle_report(ip_first, ip_last, delay)
-            return
+            # if every URL has answered sort the detection times and save it inside the report
+            if all(self.detection_times[ip] is not None for ip in self.urls):
+                self.log("[INFO] Tutti gli IP hanno risposto.")
+                detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
+                ip_first, t_first = detection_sorted[0]
+                ip_last, t_last = detection_sorted[-1]
+                delay = (t_last - t_first).total_seconds()
+                self.save_cycle_report(ip_first, ip_last, delay)
+                break
         
-        # finally check who didn't responded within max_startup_delay
-        non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
-        for ip in non_rilevati:
-            self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
-            self.gui_queue.put(('highlight_error', ip))
-            self.anomaly_count += 1
-            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-            cycle_defectives.add(ip)
+            # finally check who didn't responded within max_startup_delay
+            non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
+            for ip in non_rilevati:
+                self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
+                self.gui_queue.put(('highlight_error', ip))
+                self.anomaly_count += 1
+                self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+                cycle_defectives.add(ip)
+        
         
         if not self.wait_with_stop_check(5):
             return
