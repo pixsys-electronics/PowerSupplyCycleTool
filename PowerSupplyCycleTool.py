@@ -18,6 +18,7 @@ from ordered_set import OrderedSet
 import io
 import git
 from paramiko import AuthenticationException, BadHostKeyException, SSHClient, SSHException
+from concurrent.futures import Future, ThreadPoolExecutor
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -156,7 +157,34 @@ def run_ssh_command(server: str, username: str, password: str, command: str):
         print(f"SSH exception: {e}")
     except:
         print("Generic error")
+
+# check if a given url returns HTTP code 200 (success) using curl
+# throws subprocess.TimeoutExpired or a generic exception
+def curl(url: str) -> bool:
+    result = subprocess.run(
+        ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
+        timeout=3,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout.strip() == '200'
+
+# returns an dict where the key is an URL (string) and the value is its completed future
+# this way we can handle the future result outside of this function
+def ping(url_list: set[str]) -> dict[str, Future[bool]]:
+    # spawn a bunch of workers to start the pinging process
+    future_results = dict()
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        # run a different thread for each URL to ping and
+        # create a dictionary where the future is the key and the URL is the value
+        future_to_ip = {executor.submit(curl, url): url for url in url_list}
+        
+        # wait until every thread has finished, then iterate over each response and check it
+        for f in concurrent.futures.as_completed(future_to_ip.keys()):
+            ip = future_to_ip[f]
+            future_results[ip] = f
     
+    return future_results
 
 class RigolTestApp(tk.Tk):
     url_list_filename = 'urls.csv'
@@ -593,25 +621,70 @@ class RigolTestApp(tk.Tk):
                 f.write(line)
         except Exception as e:
             self.log(f"[ERRORE] Errore durante la scrittura del file di report: {str(e)}")
+    
+    def ping_with_detection_time(self, url_list: list[str]) -> dict[str, (datetime.datetime | None)]:
+        detection_times = dict()
+        url_futures = ping(url_list)
+        
+        response = False
+        
+        for url,future in url_futures.items():
+            try:
+                response = future.result()
+            except subprocess.TimeoutExpired:
+                self.log(f"[ERRORE] {url} non ha risposto in tempo")
+            except Exception as exc:
+                self.log(f"[ERRORE] Verifica IP {url} ha generato un'eccezione: {exc}")
+        
+            # if the response is false (either an invalid HTTP response or a timeout/exception), check the next future
+            if not response:
+                detection_times[url] = None
+            else:
+                detection_times[url] = datetime.datetime.now()
+        
+        return detection_times
             
-    def perform_test_cycle(self):
+        #     detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
+        #     self.gui_queue.put(('update_tree', url, detected_time_str))
+        #     self.log(f"[INFO] IP {url} rilevato alle {detected_time_str}")
+        #     # if it's the first URL to answer, save the timestamp as time reference
+        #     if t0 is None:
+        #         t0 = self.detection_times[url]
+        #     # otherwise compute the time difference between the current timestamp and the reference one, in seconds
+        #     else:
+        #         elapsed_since_t0 = (self.detection_times[url] - t0).total_seconds()
+        #         # if the time difference is smaller than the max startup delay, wait for the next response
+        #         if elapsed_since_t0 <= self.config.timing.max_startup_delay:
+        #             continue
+        #         # otherwise if the time difference is greater, flag it as anomaly
+        #         if url not in cycle_defectives:
+        #             self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
+        #             self.anomaly_count += 1
+        #             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+        #             cycle_defectives.add(url)
+    
+        # # if every URL has answered sort the detection times and save it inside the report
+        # if all(self.detection_times[ip] is not None for ip in self.urls):
+        #     self.log("[INFO] Tutti gli IP hanno risposto.")
+        #     detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
+        #     ip_first, t_first = detection_sorted[0]
+        #     ip_last, t_last = detection_sorted[-1]
+        #     delay = (t_last - t_first).total_seconds()
+        #     self.save_cycle_report(ip_first, ip_last, delay)
+        #     break
+    
+        # # finally check who didn't responded within max_startup_delay
+        # non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
+        # for ip in non_rilevati:
+        #     self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
+        #     self.gui_queue.put(('highlight_error', ip))
+        #     self.anomaly_count += 1
+        #     self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+        #     cycle_defectives.add(ip)
+                        
+    def ping(self):
         t0 = None
         cycle_defectives = set()
-        
-        self.cycle_count += 1
-        self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-            
-        
-        self.log(f"[INFO] (Ciclo {self.cycle_count}) Accendo alimentatore (canali 1 e 2)...")
-        try:
-            self.psu_poweron()
-        except Exception as e:
-            self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
-            return
-        
-        self.log(f"[INFO] Attendo {self.config.timing.pre_check_delay} secondi prima del controllo degli IP.")
-        if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
-            return
         
         # try to ping every URL until the test is externally stopped or until every URL has answered
         while self.wait_with_stop_check(self.config.timing.loop_check_period):
@@ -619,77 +692,39 @@ class RigolTestApp(tk.Tk):
             if self.is_paused:
                 continue
             
-            # spawn a bunch of workers to start the pinging process
-            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                # run a different thread for each URL to ping 
-                future_to_ip = {executor.submit(self.ip_responds_curl, ip): ip for ip in self.urls if self.detection_times[ip] is None}
-                
-                # wait until every thread has finished, then iterate over each response and check it
-                for future in concurrent.futures.as_completed(future_to_ip):
-                    ip = future_to_ip[future]
-                    
-                    try:
-                        response = future.result()
-                    except Exception as exc:
-                        self.log(f"[ERRORE] Verifica IP {ip} ha generato un'eccezione: {exc}")
-                        continue
-                    
-                    # if the response is false (either an invalid HTTP response or a timeout), check the next future
-                    if not response:
-                        continue
-                    self.detection_times[ip] = datetime.datetime.now()
-                    detected_time_str = self.detection_times[ip].strftime("%H:%M:%S.%f")[:-3]
-                    self.gui_queue.put(('update_tree', ip, detected_time_str))
-                    self.log(f"[INFO] IP {ip} rilevato alle {detected_time_str}")
-                    # if it's the first URL to answer, save the timestamp as time reference
-                    if t0 is None:
-                        t0 = self.detection_times[ip]
-                    # otherwise compute the time difference between the current timestamp and the reference one, in seconds
-                    else:
-                        elapsed_since_t0 = (self.detection_times[ip] - t0).total_seconds()
-                        # if the time difference is smaller than the max startup delay, wait for the next response
-                        if elapsed_since_t0 <= self.config.timing.max_startup_delay:
-                            continue
-                        # otherwise if the time difference is greater, flag it as anomaly
-                        if ip not in cycle_defectives:
-                            self.log(f"[ALLARME] IP {ip} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
-                            self.anomaly_count += 1
-                            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-                            cycle_defectives.add(ip)
-        
-            # if every URL has answered sort the detection times and save it inside the report
-            if all(self.detection_times[ip] is not None for ip in self.urls):
-                self.log("[INFO] Tutti gli IP hanno risposto.")
-                detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
-                ip_first, t_first = detection_sorted[0]
-                ip_last, t_last = detection_sorted[-1]
-                delay = (t_last - t_first).total_seconds()
-                self.save_cycle_report(ip_first, ip_last, delay)
-                break
-        
-            # finally check who didn't responded within max_startup_delay
-            non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
-            for ip in non_rilevati:
-                self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
-                self.gui_queue.put(('highlight_error', ip))
-                self.anomaly_count += 1
-                self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-                cycle_defectives.add(ip)
-        
-        
-        if not self.wait_with_stop_check(5):
-            return
-
-        self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
-        try:
-            self.psu_poweroff()
-        except Exception as e:
-            self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
-            return
-        
-        self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
-        if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
-            return
+            # ping only the URLs that havent' answered yet and save their detection times
+            url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is None])
+            detection_times = self.ping_with_detection_time(url_list_to_ping)
+            # remove the None responses
+            detection_times_valid = {k: v for k,v in detection_times.items() if v is not None}
+            # if the reference time haven't been already set, check if it can be set
+            if t0 is None and len(detection_times_valid) != 0:
+                t0 = min([v for v in detection_times_valid.values()])
+            
+            # here we enter only if detection_times_valid is not empty, so t0 have been already set
+            for url,detection_time in detection_times_valid:
+                self.detection_times[url] = detection_time
+                detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
+                self.gui_queue.put(('update_tree', url, detected_time_str))
+                self.log(f"[INFO] IP {url} rilevato alle {detected_time_str}")
+                elapsed_since_t0 = (self.detection_times[url] - t0).total_seconds()
+                # if the time difference is smaller than the max startup delay, wait for the next response
+                if elapsed_since_t0 <= self.config.timing.max_startup_delay:
+                    continue
+                # otherwise if the time difference is greater, flag it as anomaly
+                if url not in cycle_defectives:
+                    self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
+                    self.anomaly_count += 1
+                    self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+                    cycle_defectives.add(url)
+            
+            
+            
+    
+    def psu_init(self):
+        self.alimentatore.connect(self.config.connection.psu_address)
+        self.alimentatore.set_voltage(1, 26.000)
+        self.alimentatore.set_voltage(2, 26.000)
     
     def psu_poweroff(self):
         self.psu_set_state('OFF')
@@ -709,18 +744,10 @@ class RigolTestApp(tk.Tk):
         - Verifica in parallelo la risposta degli IP tramite ip_responds_curl.
         - Utilizza la stringa configurabile per costruire l'URL di verifica.
         """
-        alimentatore = dp832()
-        
-        if not self.config.connection.psu_address:
-            self.log("[ERRORE] IP alimentatore non configurato! Interrompo.")
-            self.run_test = False
-            return
         
         self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
         try:
-            alimentatore.connect(self.config.connection.psu_address)
-            alimentatore.set_voltage(1, 26.000)
-            alimentatore.set_voltage(2, 26.000)
+            self.psu_init()
         except Exception as e:
             self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
             self.run_test = False
