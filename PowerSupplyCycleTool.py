@@ -212,7 +212,9 @@ class RigolTestApp(tk.Tk):
         self.anomaly_count = 0
         
         # File di report
-        self.report_file = None
+        self.report_filename = None
+        self.report_folder = "reports"
+        self.report_filepath = None
         
         # Flag per capire se lo stop è stato manuale
         self.test_stopped_intentionally = False
@@ -602,13 +604,13 @@ class RigolTestApp(tk.Tk):
 
     def write_test_start_line(self):
         """Scrive una riga di intestazione nel file di report per l'inizio del test."""
-        if not self.report_file:
+        if not self.report_filepath:
             self.log("[ERRORE] Nome del file di report non definito.")
             return
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         line = f"### Test started at {start_time_str}\n"
         try:
-            with open(self.report_file, "a", encoding="utf-8") as f:
+            with open(self.report_filepath, "a", encoding="utf-8") as f:
                 f.write(line)
         except Exception as e:
             self.log(f"[ERRORE] Errore durante la scrittura del file di report: {str(e)}")
@@ -803,14 +805,14 @@ class RigolTestApp(tk.Tk):
         - IP del primo e dell'ultimo dispositivo che hanno risposto
         - Ritardo tra il primo e l'ultimo
         """
-        if not self.report_file:
+        if not self.report_filepath:
             self.log("[ERRORE] Nome del file di report non definito. Impossibile salvare il ciclo.")
             return
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cycle_str = f"{self.cycle_count:5d}"
         line = f"{now_str};\t{cycle_str};\t{ip_first};\t{ip_last};\t{delay:.3f}\n"
         try:
-            with open(self.report_file, "a", encoding="utf-8") as f:
+            with open(self.report_filepath, "a", encoding="utf-8") as f:
                 f.write(line)
         except Exception as e:
             self.log(f"[ERRORE] Errore durante la scrittura del ciclo nel report: {str(e)}")
@@ -832,8 +834,9 @@ class RigolTestApp(tk.Tk):
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
             self.anomaly_count = 0
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-            self.report_file = self.make_report_filename()
-            if self.report_file:
+            self.report_filename = self.make_report_filename()
+            self.report_filepath = os.path.join(os.getcwd(), self.report_folder, self.report_filename)
+            if self.report_filepath:
                 self.write_test_start_line()
             else:
                 self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
