@@ -835,7 +835,9 @@ class RigolTestApp(tk.Tk):
             self.anomaly_count = 0
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             self.report_filename = self.make_report_filename()
-            self.report_filepath = os.path.join(os.getcwd(), self.report_folder, self.report_filename)
+            report_folderpath = os.path.join(os.getcwd(), self.report_folder)
+            os.makedirs(report_folderpath, exist_ok=True)
+            self.report_filepath = os.path.join(report_folderpath, self.report_filename)
             if self.report_filepath:
                 self.write_test_start_line()
             else:
