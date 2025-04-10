@@ -142,21 +142,10 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
     data = OrderedSet([row['url'] for row in csv_reader])
     return data
 
-def run_ssh_command(server: str, username: str, password: str, command: str):
-    try:
-        ssh = SSHClient()
-        ssh.connect(server, username=username, password=password)
-        ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(command)
-    except BadHostKeyException as e:
-        print(f"Bad host key: {e}")
-    except AuthenticationException as e:
-        print(f"Authentication exception: {e}")
-    except socket.error as e:
-        print(f"socket error: {e}")
-    except SSHException as e:
-        print(f"SSH exception: {e}")
-    except:
-        print("Generic error")
+def run_ssh_command(server: str, username: str, password: str, command: str) -> tuple:
+    ssh = SSHClient()
+    ssh.connect(server, username=username, password=password)
+    return ssh.exec_command(command)
 
 # check if a given url returns HTTP code 200 (success) using curl
 # throws subprocess.TimeoutExpired or a generic exception
@@ -762,20 +751,38 @@ class RigolTestApp(tk.Tk):
                     continue
                 if self.ping():
                     break
-
-            self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
-            if not self.wait_with_stop_check(5):
-                break
-
-            self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
-            try:
-                self.psu_poweroff()
-                self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
-                if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
+            
+            if self.config.ssh.enabled:
+                self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
+                if not self.wait_with_stop_check(5):
                     break
-            except Exception as e:
-                self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
-                continue
+                try:
+                    ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command()
+                except BadHostKeyException as e:
+                    print(f"Bad host key: {e}")
+                except AuthenticationException as e:
+                    print(f"Authentication exception: {e}")
+                except socket.error as e:
+                    print(f"socket error: {e}")
+                except SSHException as e:
+                    print(f"SSH exception: {e}")
+                except Exception as e:
+                    print(f"Generic error: {e}")
+            
+            else:    
+                self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
+                if not self.wait_with_stop_check(5):
+                    break
+
+                self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
+                try:
+                    self.psu_poweroff()
+                    self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
+                    if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
+                        break
+                except Exception as e:
+                    self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
+                    continue
 
         if not self.test_stopped_intentionally:
             self.log("[INFO] Spegnimento finale dell'alimentatore...")
