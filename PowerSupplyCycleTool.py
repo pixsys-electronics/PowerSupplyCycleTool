@@ -149,18 +149,22 @@ def run_ssh_command(server: str, username: str, password: str, command: str) -> 
 
 # check if a given url returns HTTP code 200 (success) using curl
 # throws subprocess.TimeoutExpired or a generic exception
-def curl(url: str) -> bool:
+def curl(url: str) -> (datetime.datetime | None):
     result = subprocess.run(
         ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
         timeout=3,
         capture_output=True,
         text=True
     )
-    return result.stdout.strip() == '200'
+    timestamp = None
+    if result.stdout.strip() == '200':
+        timestamp = datetime.datetime.now()
+    
+    return timestamp
 
 # returns an dict where the key is an URL (string) and the value is its completed future
 # this way we can handle the future result outside of this function
-def ping(url_list: set[str]) -> dict[str, Future[bool]]:
+def ping(url_list: set[str]) -> dict[str, Future[datetime.datetime | None]]:
     # spawn a bunch of workers to start the pinging process
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
@@ -524,23 +528,6 @@ class RigolTestApp(tk.Tk):
         with open(url_list_path, mode="w", encoding="utf-8") as file:
             file.write(content)
             
-    # check if a given url returns HTTP code 200 (success) using curl
-    def ip_responds_curl(self, url: str) -> bool:
-        try:
-            result = subprocess.run(
-                ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
-                timeout=3,
-                capture_output=True,
-                text=True
-            )
-            return result.stdout.strip() == '200'
-        except subprocess.TimeoutExpired:
-            self.log(f"[DEBUG] IP {url} non risponde: Timeout")
-            return False
-        except Exception as e:
-            self.log(f"[DEBUG] IP {url} verifica fallita: {e}")
-            return False
-    
     def clear_address_table(self):
         self.urls.clear()
         self.refresh_address_table()
@@ -616,7 +603,7 @@ class RigolTestApp(tk.Tk):
             self.log(f"[ERRORE] Errore durante la scrittura del file di report: {str(e)}")
     
     def ping_with_detection_time(self, url_list: list[str]) -> dict[str, (datetime.datetime | None)]:
-        detection_times = dict()
+        detection_times: dict[str, (datetime.datetime | None)] = dict()
         url_futures = ping(url_list)
         
         response = False
@@ -629,11 +616,7 @@ class RigolTestApp(tk.Tk):
             except Exception as exc:
                 self.log(f"[ERRORE] Verifica IP {url} ha generato un'eccezione: {exc}")
         
-            # if the response is false (either an invalid HTTP response or a timeout/exception), check the next future
-            if not response:
-                detection_times[url] = None
-            else:
-                detection_times[url] = datetime.datetime.now()
+            detection_times[url] = response
         
         return detection_times
     
@@ -760,6 +743,7 @@ class RigolTestApp(tk.Tk):
                     break
                 try:
                     ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command()
+                    # ssh_stdout._r
                 except BadHostKeyException as e:
                     print(f"Bad host key: {e}")
                 except AuthenticationException as e:
