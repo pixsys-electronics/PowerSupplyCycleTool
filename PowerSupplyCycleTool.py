@@ -205,7 +205,9 @@ class RigolTestApp(tk.Tk):
     
         # Lista IP e tempi di rilevamento
         self.urls: OrderedSet[str] = OrderedSet()
-        self.detection_times = {}
+        self.detection_times: dict[str, datetime.datetime] = {}
+        self.cycle_defectives: set[str] = set()
+        self.t0: datetime.datetime | None = None
         
         # Code per log e comunicazioni verso la GUI
         self.log_queue = queue.Queue()
@@ -644,83 +646,50 @@ class RigolTestApp(tk.Tk):
         
         return detection_times
             
-        #     detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
-        #     self.gui_queue.put(('update_tree', url, detected_time_str))
-        #     self.log(f"[INFO] IP {url} rilevato alle {detected_time_str}")
-        #     # if it's the first URL to answer, save the timestamp as time reference
-        #     if t0 is None:
-        #         t0 = self.detection_times[url]
-        #     # otherwise compute the time difference between the current timestamp and the reference one, in seconds
-        #     else:
-        #         elapsed_since_t0 = (self.detection_times[url] - t0).total_seconds()
-        #         # if the time difference is smaller than the max startup delay, wait for the next response
-        #         if elapsed_since_t0 <= self.config.timing.max_startup_delay:
-        #             continue
-        #         # otherwise if the time difference is greater, flag it as anomaly
-        #         if url not in cycle_defectives:
-        #             self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
-        #             self.anomaly_count += 1
-        #             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-        #             cycle_defectives.add(url)
-    
-        # # if every URL has answered sort the detection times and save it inside the report
-        # if all(self.detection_times[ip] is not None for ip in self.urls):
-        #     self.log("[INFO] Tutti gli IP hanno risposto.")
-        #     detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
-        #     ip_first, t_first = detection_sorted[0]
-        #     ip_last, t_last = detection_sorted[-1]
-        #     delay = (t_last - t_first).total_seconds()
-        #     self.save_cycle_report(ip_first, ip_last, delay)
-        #     break
-    
-        # # finally check who didn't responded within max_startup_delay
-        # non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
-        # for ip in non_rilevati:
-        #     self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
-        #     self.gui_queue.put(('highlight_error', ip))
-        #     self.anomaly_count += 1
-        #     self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-        #     cycle_defectives.add(ip)
-                        
     def ping(self):
-        t0 = None
-        cycle_defectives = set()
+        # ping only the URLs that havent' answered yet and save their detection times
+        url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is None])
+        detection_times = self.ping_with_detection_time(url_list_to_ping)
+        # remove the None responses
+        detection_times_valid = {k: v for k,v in detection_times.items() if v is not None}
+        # if the reference time haven't been already set, check if it can be set
+        if self.t0 is None and len(detection_times_valid) != 0:
+            self.t0 = min([v for v in detection_times_valid.values()])
         
-        # try to ping every URL until the test is externally stopped or until every URL has answered
-        while self.wait_with_stop_check(self.config.timing.loop_check_period):
-            # if the test is paused, go to the next cycle and re-check 
-            if self.is_paused:
-                continue
-            
-            # ping only the URLs that havent' answered yet and save their detection times
-            url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is None])
-            detection_times = self.ping_with_detection_time(url_list_to_ping)
-            # remove the None responses
-            detection_times_valid = {k: v for k,v in detection_times.items() if v is not None}
-            # if the reference time haven't been already set, check if it can be set
-            if t0 is None and len(detection_times_valid) != 0:
-                t0 = min([v for v in detection_times_valid.values()])
-            
-            # here we enter only if detection_times_valid is not empty, so t0 have been already set
-            for url,detection_time in detection_times_valid:
-                self.detection_times[url] = detection_time
-                detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
-                self.gui_queue.put(('update_tree', url, detected_time_str))
-                self.log(f"[INFO] IP {url} rilevato alle {detected_time_str}")
-                elapsed_since_t0 = (self.detection_times[url] - t0).total_seconds()
-                # if the time difference is smaller than the max startup delay, wait for the next response
-                if elapsed_since_t0 <= self.config.timing.max_startup_delay:
-                    continue
-                # otherwise if the time difference is greater, flag it as anomaly
-                if url not in cycle_defectives:
-                    self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
-                    self.anomaly_count += 1
-                    self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-                    cycle_defectives.add(url)
-            
-            
-            
-    
+        # here we enter only if detection_times_valid is not empty, so t0 have been already set
+        # here we compute the time difference between the first response (reference t0) and the other URLs
+        for url,detection_time in detection_times_valid:
+            self.detection_times[url] = detection_time
+            detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
+            self.gui_queue.put(('update_tree', url, detected_time_str))
+            self.log(f"[INFO] IP {url} rilevato alle {detected_time_str}")
+            elapsed_since_t0 = (self.detection_times[url] - self.t0).total_seconds()
+            # if the time difference is greater than the max startup delay, flag it as anomaly
+            if elapsed_since_t0 > self.config.timing.max_startup_delay and url not in self.cycle_defectives:
+                self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
+                self.anomaly_count += 1
+                self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+                self.cycle_defectives.add(url)
+        
+        # if every URL has answered, generate the report file and exit
+        if all(self.detection_times[ip] is not None for ip in self.urls):
+            self.log("[INFO] Tutti gli IP hanno risposto.")
+            detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
+            ip_first, t_first = detection_sorted[0]
+            ip_last, t_last = detection_sorted[-1]
+            delay = (t_last - t_first).total_seconds()
+            self.save_cycle_report(ip_first, ip_last, delay)
+            return
+        
+        # finally check who didn't responded yet
+        non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
+        for ip in non_rilevati:
+            self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
+            self.gui_queue.put(('highlight_error', ip))
+            self.anomaly_count += 1
+            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+            self.cycle_defectives.add(ip)
+        
     def psu_init(self):
         self.alimentatore.connect(self.config.connection.psu_address)
         self.alimentatore.set_voltage(1, 26.000)
