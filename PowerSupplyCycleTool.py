@@ -633,7 +633,7 @@ class RigolTestApp(tk.Tk):
         
         # here we enter only if detection_times_valid is not empty, so t0 have been already set
         # here we compute the time difference between the first response (reference t0) and the other URLs
-        for url,detection_time in detection_times_valid:
+        for url,detection_time in detection_times_valid.items():
             self.detection_times[url] = detection_time
             detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
             self.gui_queue.put(('update_tree', url, detected_time_str))
@@ -654,7 +654,7 @@ class RigolTestApp(tk.Tk):
             ip_last, t_last = detection_sorted[-1]
             delay = (t_last - t_first).total_seconds()
             self.save_cycle_report(ip_first, ip_last, delay)
-            return
+            return True
         
         # finally check who didn't responded yet
         non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
@@ -664,6 +664,8 @@ class RigolTestApp(tk.Tk):
             self.anomaly_count += 1
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             self.cycle_defectives.add(ip)
+        
+        return False
     
     def psu_connect(self):
         self.alimentatore.connect(self.config.connection.psu_address)        
