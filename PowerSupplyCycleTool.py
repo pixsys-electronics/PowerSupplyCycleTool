@@ -708,7 +708,9 @@ class RigolTestApp(tk.Tk):
             # Gestione pausa
             if self.is_paused:
                 continue
-
+            
+            self.cycle_defectives.clear()
+            self.t0 = None
             self.cycle_count += 1
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
             
@@ -747,15 +749,15 @@ class RigolTestApp(tk.Tk):
                     ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command()
                     # ssh_stdout._r
                 except BadHostKeyException as e:
-                    print(f"Bad host key: {e}")
+                    self.log(f"[ERROR] Bad host key: {e}")
                 except AuthenticationException as e:
-                    print(f"Authentication exception: {e}")
+                    self.log(f"[ERROR] Authentication exception: {e}")
                 except socket.error as e:
-                    print(f"socket error: {e}")
+                    self.log(f"[ERROR] socket error: {e}")
                 except SSHException as e:
-                    print(f"SSH exception: {e}")
+                    self.log(f"[ERROR] SSH exception: {e}")
                 except Exception as e:
-                    print(f"Generic error: {e}")
+                    self.log(f"[ERROR] Generic error: {e}")
             
             else:    
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
@@ -808,8 +810,6 @@ class RigolTestApp(tk.Tk):
         if not self.run_test:
             self.run_test = True
             self.is_paused = False
-            self.cycle_defectives.clear()
-            self.t0 = None
             self.pause_status_label.configure(text="Stato: In esecuzione")
             self.pause_button.configure(text="Pausa")
             self.log("[INFO] Test avviato.")
