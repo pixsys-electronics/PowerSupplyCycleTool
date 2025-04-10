@@ -644,8 +644,6 @@ class RigolTestApp(tk.Tk):
             # if the time difference is greater than the max startup delay, flag it as anomaly
             if elapsed_since_t0 > self.config.timing.max_startup_delay and url not in self.cycle_defectives:
                 self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
-                self.anomaly_count += 1
-                self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
                 self.cycle_defectives.add(url)
         
         # if every URL has answered, generate the report file and exit
@@ -662,8 +660,6 @@ class RigolTestApp(tk.Tk):
         for ip in non_rilevati:
             self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
             self.gui_queue.put(('highlight_error', ip))
-            self.anomaly_count += 1
-            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             self.cycle_defectives.add(ip)
         
         return False
@@ -741,6 +737,10 @@ class RigolTestApp(tk.Tk):
                     continue
                 if self.ping():
                     break
+            
+            # update the anomaly count using the size of the cycle_defectives set
+            self.anomaly_count = self.anomaly_count + len(self.cycle_defectives)
+            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             
             if self.config.ssh.enabled:
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
