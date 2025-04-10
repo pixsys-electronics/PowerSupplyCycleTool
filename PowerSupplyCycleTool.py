@@ -760,8 +760,10 @@ class RigolTestApp(tk.Tk):
                 for url in self.urls:
                     try:
                         ip = ip_from_url(url)
+                        if ip is None:
+                            continue
                         ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command(
-                            ip,
+                            str(ip),
                             self.config.ssh.username,
                             self.config.ssh.password,
                             self.config.ssh.command
