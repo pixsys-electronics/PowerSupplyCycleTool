@@ -19,6 +19,7 @@ import io
 import git
 from paramiko import AuthenticationException, BadHostKeyException, SSHClient, SSHException
 from concurrent.futures import Future, ThreadPoolExecutor
+import re
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -124,6 +125,16 @@ class TestBenchConfig:
 
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
+
+def ip_from_url(url: str) -> (IPv4Address | None):
+    ip = None
+    ip_regex = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+    ip_match = re.search(ip_regex, url)
+    if ip_match is not None:
+        ip = ip_match.group(0)
+        ip = IPv4Address(ip)
+    
+    return ip
 
 def get_current_git_commit_hash():
     repo = git.Repo(os.getcwd())
@@ -748,8 +759,9 @@ class RigolTestApp(tk.Tk):
                     break
                 for url in self.urls:
                     try:
+                        ip = ip_from_url(url)
                         ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command(
-                            url,
+                            ip,
                             self.config.ssh.username,
                             self.config.ssh.password,
                             self.config.ssh.command
