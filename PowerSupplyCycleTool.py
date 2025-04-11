@@ -153,9 +153,9 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
     data = OrderedSet([row['url'] for row in csv_reader])
     return data
 
-def run_ssh_command(server: str, username: str, password: str, command: str) -> tuple:
+def run_ssh_command(server: IPv4Address, username: str, password: str, command: str) -> tuple:
     ssh = SSHClient()
-    ssh.connect(server, username=username, password=password)
+    ssh.connect(str(server), username=username, password=password)
     return ssh.exec_command(command)
 
 # check if a given url returns HTTP code 200 (success) using curl
@@ -175,13 +175,29 @@ def curl(url: str) -> (datetime.datetime | None):
 
 # returns an dict where the key is an URL (string) and the value is its completed future
 # this way we can handle the future result outside of this function
-def ping(url_list: set[str]) -> dict[str, Future[datetime.datetime | None]]:
+def broadcast_ping(url_list: set[str]) -> dict[str, Future[datetime.datetime | None]]:
     # spawn a bunch of workers to start the pinging process
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
         # run a different thread for each URL to ping and
         # create a dictionary where the future is the key and the URL is the value
         future_to_ip = {executor.submit(curl, url): url for url in url_list}
+        
+        # wait until every thread has finished, then iterate over each response and check it
+        for f in concurrent.futures.as_completed(future_to_ip.keys()):
+            ip = future_to_ip[f]
+            future_results[ip] = f
+    
+    return future_results
+
+# returns a dict where the key is the IP and the value is its completed future
+def broadcast_ssh_command(ip_list: set[IPv4Address], username: str, password: str, command: str) -> dict[IPv4Address, Future[tuple | None]]:
+    # spawn a bunch of workers to start the pinging process
+    future_results = dict()
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        # run a different thread for each URL to ping and
+        # create a dictionary where the future is the key and the URL is the value
+        future_to_ip = {executor.submit(run_ssh_command, ip, username, password, command): ip for ip in ip_list}
         
         # wait until every thread has finished, then iterate over each response and check it
         for f in concurrent.futures.as_completed(future_to_ip.keys()):
@@ -615,7 +631,7 @@ class RigolTestApp(tk.Tk):
     
     def ping_with_detection_time(self, url_list: list[str]) -> dict[str, (datetime.datetime | None)]:
         detection_times: dict[str, (datetime.datetime | None)] = dict()
-        url_futures = ping(url_list)
+        url_futures = broadcast_ping(url_list)
         
         response = None
         
@@ -757,18 +773,13 @@ class RigolTestApp(tk.Tk):
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
                 if not self.wait_with_stop_check(5):
                     break
-                for url in self.urls:
+                ip_list = [ip_from_url(url) for url in self.urls]
+                ip_list = [ip for ip in ip_list if ip is not None]
+                futures_dict = broadcast_ssh_command(ip_list, self.config.ssh.username, self.config.ssh.password, self.config.ssh.command)
+                for ip,future in futures_dict.items():
                     try:
-                        ip = ip_from_url(url)
-                        if ip is None:
-                            self.log(f"[ERROR] cannot retrieve IP from {url}")
-                            continue
-                        ssh_stdin, ssh_stdout, ssh_stderr = run_ssh_command(
-                            str(ip),
-                            self.config.ssh.username,
-                            self.config.ssh.password,
-                            self.config.ssh.command
-                        )
+                        stdint, stdout, stderr = future.result()
+                        self.log(f"[INFO] SSH command succesfully sent to {str(ip)}")
                     except BadHostKeyException as e:
                         self.log(f"[ERROR] Bad host key: {e}")
                     except AuthenticationException as e:
