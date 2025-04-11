@@ -791,6 +791,9 @@ class RigolTestApp(tk.Tk):
                         self.log(f"[ERROR] SSH exception: {e}")
                     except Exception as e:
                         self.log(f"[ERROR] Generic error: {e}")
+                
+                if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
+                        break
             
             else:    
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
