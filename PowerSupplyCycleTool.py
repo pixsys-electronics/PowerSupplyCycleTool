@@ -17,7 +17,7 @@ from ipaddress import IPv4Address, ip_address
 from ordered_set import OrderedSet
 import io
 import git
-from paramiko import AuthenticationException, BadHostKeyException, SSHClient, SSHException
+from paramiko import AuthenticationException, AutoAddPolicy, BadHostKeyException, SSHClient, SSHException
 from concurrent.futures import Future, ThreadPoolExecutor
 import re
 
@@ -155,6 +155,7 @@ def url_list_from_csv(content: str) -> OrderedSet[str]:
 
 def run_ssh_command(server: IPv4Address, username: str, password: str, command: str) -> tuple:
     ssh = SSHClient()
+    ssh.set_missing_host_key_policy(AutoAddPolicy())
     ssh.connect(str(server), username=username, password=password)
     return ssh.exec_command(command)
 
