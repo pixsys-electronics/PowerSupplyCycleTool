@@ -738,14 +738,18 @@ class RigolTestApp(tk.Tk):
             self.t0 = None
             self.cycle_count += 1
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
+
+            self.log(f"[INFO] Ciclo {self.cycle_count}")
             
-            self.log(f"[INFO] (Ciclo {self.cycle_count}) Accendo alimentatore (canali 1 e 2)...")
-            try:
-                self.psu_poweron()
-            except Exception as e:
-                self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
-                continue
-            
+            # if SSH remote command is not enabled or it is enabled and it's the first cycle, switch on the PSU
+            if not self.config.ssh.enabled or (self.config.ssh.enabled and self.cycle_count == 1):
+                try:
+                    self.psu_poweron()
+                    self.log(f"[INFO] Alimentatore acceso")                    
+                except Exception as e:
+                    self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
+                    continue
+                        
             # clear detection times and GUI
             for ip in self.urls:
                 self.detection_times[ip] = None
