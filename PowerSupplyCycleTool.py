@@ -20,6 +20,7 @@ import git
 from paramiko import AuthenticationException, AutoAddPolicy, BadHostKeyException, SSHClient, SSHException
 from concurrent.futures import Future, ThreadPoolExecutor
 import re
+from pyModbusTCP.client import ModbusClient
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -159,6 +160,11 @@ def run_ssh_command(server: IPv4Address, username: str, password: str, command: 
     ssh.connect(str(server), username=username, password=password)
     return ssh.exec_command(command)
 
+def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int):
+    c = ModbusClient(host=str(host), auto_open=True, auto_close=True)
+    regs = c.read_holding_registers(reg_addr, reg_num)
+    return regs
+
 # check if a given url returns HTTP code 200 (success) using curl
 # throws subprocess.TimeoutExpired or a generic exception
 def curl(url: str) -> (datetime.datetime | None):
@@ -206,6 +212,21 @@ def broadcast_ssh_command(ip_list: set[IPv4Address], username: str, password: st
             future_results[ip] = f
     
     return future_results
+
+def broadcast_modbus_read_registers(ip_list: set[IPv4Address], reg_addr: int, reg_num: int) -> dict[IPv4Address, Future[list | None]]:
+    future_results = dict()
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_ip = {executor.submit(run_modbus_read_registers, ip, reg_addr, reg_num): ip for ip in ip_list}
+        
+        # wait until every thread has finished, then iterate over each response and check it
+        for f in concurrent.futures.as_completed(future_to_ip.keys()):
+            ip = future_to_ip[f]
+            future_results[ip] = f
+    
+    return future_results
+
+def broadcast_modbus_read_poweron_counter(ip_list) -> dict[IPv4Address, Future[list | None]]:
+    return broadcast_modbus_read_registers(ip_list, 0, 1)
 
 class RigolTestApp(tk.Tk):
     url_list_filename = 'urls.csv'
@@ -773,6 +794,26 @@ class RigolTestApp(tk.Tk):
             # update the anomaly count using the size of the cycle_defectives set
             self.anomaly_count = self.anomaly_count + len(self.cycle_defectives)
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+            
+            ip_list = [ip_from_url(url) for url in self.urls]
+            
+            # check if everyone has the same cycle count reading from registers using MODBUS protocol
+            futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+            for ip,future in futures_dict.items():
+                try:
+                    regs = future.result()
+                    if regs is None:
+                        self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                        continue
+                    counter = regs[0]
+                    if counter != self.cycle_count:
+                        self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
+                        self.run_test = False
+                        break
+                    
+                    self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+                except Exception as e:
+                    self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request")
             
             if self.config.ssh.enabled:
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")

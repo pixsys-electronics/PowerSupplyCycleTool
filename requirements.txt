@@ -9,3 +9,4 @@ netaddr
 ordered-set
 gitpython
 paramiko
+pyModbusTCP
