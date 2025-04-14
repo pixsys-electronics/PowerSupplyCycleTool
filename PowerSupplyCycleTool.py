@@ -165,6 +165,11 @@ def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int):
     regs = c.read_holding_registers(reg_addr, reg_num)
     return regs
 
+def run_modbus_write_regiter(host: IPv4Address, reg_addr: int, value: int):
+    c = ModbusClient(host=str(host), auto_open=True, auto_close=True)
+    ok = c.write_single_register(reg_addr, value)
+    return ok
+
 # check if a given url returns HTTP code 200 (success) using curl
 # throws subprocess.TimeoutExpired or a generic exception
 def curl(url: str) -> (datetime.datetime | None):
@@ -225,8 +230,23 @@ def broadcast_modbus_read_registers(ip_list: set[IPv4Address], reg_addr: int, re
     
     return future_results
 
+def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, reg_value: int) -> dict[IPv4Address, Future[bool]]:
+    future_results = dict()
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_ip = {executor.submit(run_modbus_write_regiter, ip, reg_addr, reg_value): ip for ip in ip_list}
+        
+        # wait until every thread has finished, then iterate over each response and check it
+        for f in concurrent.futures.as_completed(future_to_ip.keys()):
+            ip = future_to_ip[f]
+            future_results[ip] = f
+    
+    return future_results
+
 def broadcast_modbus_read_poweron_counter(ip_list) -> dict[IPv4Address, Future[list | None]]:
     return broadcast_modbus_read_registers(ip_list, 0, 1)
+
+def broadcast_modbus_write_poweron_counter(ip_list, reg_value: int) -> dict[IPv4Address, Future[bool]]:
+    return broadcast_modbus_write_register(ip_list, 0, reg_value)
 
 class RigolTestApp(tk.Tk):
     url_list_filename = 'urls.csv'
@@ -384,6 +404,9 @@ class RigolTestApp(tk.Tk):
 
         self.force_off_button = ttk.Button(self.manual_frame, text="Forza OFF", command=self.force_power_off)
         self.force_off_button.pack(side="left", padx=5, pady=5)
+        
+        self.reset_cycle_count_button = ttk.Button(self.manual_frame, text="Reset cycle count", command=self.reset_cycle_count)
+        self.reset_cycle_count_button.pack(side="left", padx=5, pady=5)
 
         self.pause_status_label = ttk.Label(self.manual_frame, text="Stato: In esecuzione")
         self.pause_status_label.pack(side="left", padx=5, pady=5)
@@ -813,7 +836,7 @@ class RigolTestApp(tk.Tk):
                     
                     self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
                 except Exception as e:
-                    self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request")
+                    self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
             
             if self.config.ssh.enabled:
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
@@ -959,6 +982,22 @@ class RigolTestApp(tk.Tk):
             self.log("[INFO] Alimentatore forzato su OFF.")
         except Exception as e:
             self.log(f"[ERRORE] Errore durante lo spegnimento forzato: {str(e)}")
+    
+    def reset_cycle_count(self):
+        self.cycle_count = 0
+        ip_list = [ip_from_url(url) for url in self.urls]
+        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
+        for ip,future in futures_dict.items():
+            try:
+                ok = future.result()
+                if not ok:
+                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    continue
+                
+                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+            except Exception as e:
+                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+
 
     def wait_with_stop_check(self, seconds):
         """Esegue attese a piccoli step verificando se il test è ancora attivo."""
