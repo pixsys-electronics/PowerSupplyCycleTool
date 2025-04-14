@@ -16,6 +16,9 @@ class dp832:
         self.rm = visa.ResourceManager()
         self.inst = None
     
+    def is_initialized(self) -> bool:
+        self.inst is None
+    
     def connect(self, ip):
         time.sleep(1)
         self.inst = self.rm.open_resource(f"TCPIP::{ip}::INSTR")

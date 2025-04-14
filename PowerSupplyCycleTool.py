@@ -743,6 +743,9 @@ class RigolTestApp(tk.Tk):
         self.alimentatore.set_voltage(1, 26.000)
         self.alimentatore.set_voltage(2, 26.000)
     
+    def psu_initialized(self):
+        self.alimentatore.is_initialized()
+    
     def psu_poweroff(self):
         self.psu_set_state('OFF')
     
@@ -763,14 +766,15 @@ class RigolTestApp(tk.Tk):
         """
         
         # connect to the PSU
-        self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
-        try:
-            self.psu_connect()
-            self.psu_init()
-        except Exception as e:
-            self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
-            self.run_test = False
-            return
+        if not self.config.ssh.enabled:
+            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            try:
+                self.psu_connect()
+                self.psu_init()
+            except Exception as e:
+                self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
+                self.run_test = False
+                return
         
         # start the main loop
         while self.wait_with_stop_check(self.config.timing.loop_check_period):
@@ -786,7 +790,7 @@ class RigolTestApp(tk.Tk):
             self.log(f"[INFO] Ciclo {self.cycle_count}")
             
             # if SSH remote command is not enabled or it is enabled and it's the first cycle, switch on the PSU
-            if not self.config.ssh.enabled or (self.config.ssh.enabled and self.cycle_count == 1):
+            if not self.config.ssh.enabled:
                 try:
                     self.psu_poweron()
                     self.log(f"[INFO] Alimentatore acceso")                    
@@ -822,6 +826,7 @@ class RigolTestApp(tk.Tk):
             
             # check if everyone has the same cycle count reading from registers using MODBUS protocol
             futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+            cycle_count_failure = False
             for ip,future in futures_dict.items():
                 try:
                     regs = future.result()
@@ -831,12 +836,19 @@ class RigolTestApp(tk.Tk):
                     counter = regs[0]
                     if counter != self.cycle_count:
                         self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
-                        self.run_test = False
+                        cycle_count_failure = True
                         break
+
+                    self.log(f"[INFO] {str(ip)} cycle count is up-to-date")
                     
-                    self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
                 except Exception as e:
                     self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                    cycle_count_failure = True
+                    break
+            
+            # if something went wrong during the cycle count check, byee
+            if cycle_count_failure:
+                break
             
             if self.config.ssh.enabled:
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
@@ -877,8 +889,8 @@ class RigolTestApp(tk.Tk):
                 except Exception as e:
                     self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
                     continue
-
-        if not self.test_stopped_intentionally:
+                
+        if not self.test_stopped_intentionally and self.psu_initialized():
             self.log("[INFO] Spegnimento finale dell'alimentatore...")
             try:
                 self.psu_poweroff()
