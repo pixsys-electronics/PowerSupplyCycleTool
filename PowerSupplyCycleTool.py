@@ -21,6 +21,7 @@ from paramiko import AuthenticationException, AutoAddPolicy, BadHostKeyException
 from concurrent.futures import Future, ThreadPoolExecutor
 import re
 from pyModbusTCP.client import ModbusClient
+from gui import ModbusFrame
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -329,7 +330,7 @@ class RigolTestApp(tk.Tk):
         self.init_psu_frame(top_left_frame, 0, 0)
         self.init_params_frame(top_left_frame, 1, 0)
         self.init_ssh_frame(top_left_frame, 2, 0)
-        self.init_modbus_frame(top_left_frame, 3, 0)
+        self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nw")
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
@@ -473,23 +474,30 @@ class RigolTestApp(tk.Tk):
         self.modbus_frame = ttk.LabelFrame(parent, text="MODBUS")
         self.modbus_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
         
+        # ROW0
         self.modbus_enable = IntVar(master = self.modbus_frame, value=self.config.ssh.enabled)
-        
         c1 = tk.Checkbutton(self.modbus_frame, text='Enable automatic cycle count check',variable=self.modbus_enable, command=self.on_checkbutton_toggle)
-        c1.grid(row=row+1, column=col, padx=10, pady=5, sticky="nw")
+        c1.grid(row=0, column=col, padx=10, pady=5, sticky="nw")
         
-        ttk.Label(self.modbus_frame, text="Register address").grid(row=row+2, column=col, sticky="nw", padx=5, pady=2)
-        self.modbus_register_var = tk.StringVar()
-        modbus_register_address_entry = ttk.Entry(self.modbus_frame, width=20, textvariable=self.modbus_register_var)
-        modbus_register_address_entry.grid(row=row+2, column=col + 1, padx=10, pady=5, sticky="nw")
+        # ROW1 - register frame
+        register_frame = ttk.Frame(self.modbus_frame)
+        register_frame.grid(row=1, column=col, padx=10, pady=5, sticky="nw")
         
-        ttk.Label(self.modbus_frame, text="Register value").grid(row=row+3, column=col, sticky="nw", padx=5, pady=2)
-        self.modbus_register_var = tk.StringVar()
-        modbus_register_value_entry = ttk.Entry(self.modbus_frame, width=20, textvariable=self.modbus_register_var)
-        modbus_register_value_entry.grid(row=row+3, column=col + 1, padx=10, pady=5, sticky="nw")
+        register_address_label = ttk.Label(register_frame, text="Register address")
+        register_address_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        self.modbus_register_address_var = tk.StringVar()
+        modbus_register_address_entry = ttk.Entry(register_frame, width=20, textvariable=self.modbus_register_address_var)
+        modbus_register_address_entry.grid(row=0, column=1, padx=0, pady=0, sticky="nw")
         
+        register_value_label = ttk.Label(register_frame, text="Register value")
+        register_value_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+        self.modbus_register_value_var = tk.StringVar()
+        modbus_register_value_entry = ttk.Entry(register_frame, width=20, textvariable=self.modbus_register_value_var)
+        modbus_register_value_entry.grid(row=1, column=1, padx=0, pady=0, sticky="nw")
+
+        # ROW2 - buttons frame
         buttons_frame = ttk.Frame(self.modbus_frame)
-        buttons_frame.grid(row=row+4, column=col, padx=10, pady=5, sticky="nw")
+        buttons_frame.grid(row=2, column=col, padx=10, pady=5, sticky="nw")
         
         self.modbus_read_register_button = ttk.Button(buttons_frame, text="Read", command=self.force_power_on)
         self.modbus_read_register_button.pack(side="left", padx=5, pady=0)
