@@ -329,6 +329,7 @@ class RigolTestApp(tk.Tk):
         self.init_psu_frame(top_left_frame, 0, 0)
         self.init_params_frame(top_left_frame, 1, 0)
         self.init_ssh_frame(top_left_frame, 2, 0)
+        self.init_modbus_frame(top_left_frame, 3, 0)
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
@@ -408,9 +409,6 @@ class RigolTestApp(tk.Tk):
 
         self.force_off_button = ttk.Button(self.manual_frame, text="Forza OFF", command=self.force_power_off)
         self.force_off_button.pack(side="left", padx=5, pady=5)
-        
-        self.reset_cycle_count_button = ttk.Button(self.manual_frame, text="Reset cycle count", command=self.reset_cycle_count)
-        self.reset_cycle_count_button.pack(side="left", padx=5, pady=5)
 
         self.pause_status_label = ttk.Label(self.manual_frame, text="Stato: In esecuzione")
         self.pause_status_label.pack(side="left", padx=5, pady=5)
@@ -470,6 +468,40 @@ class RigolTestApp(tk.Tk):
         command = ttk.Entry(self.ssh_frame, width=20, textvariable=self.command_var)
         self.command_var.trace_add("write", self.on_command_change)
         command.grid(row=row+3, column=col+1, padx=10, pady=5, sticky="nw")
+    
+    def init_modbus_frame(self, parent, row, col):
+        self.modbus_frame = ttk.LabelFrame(parent, text="MODBUS")
+        self.modbus_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
+        
+        self.modbus_enable = IntVar(master = self.modbus_frame, value=self.config.ssh.enabled)
+        
+        c1 = tk.Checkbutton(self.modbus_frame, text='Enable automatic cycle count check',variable=self.modbus_enable, command=self.on_checkbutton_toggle)
+        c1.grid(row=row+1, column=col, padx=10, pady=5, sticky="nw")
+        
+        ttk.Label(self.modbus_frame, text="Register address").grid(row=row+2, column=col, sticky="nw", padx=5, pady=2)
+        self.modbus_register_var = tk.StringVar()
+        modbus_register_address_entry = ttk.Entry(self.modbus_frame, width=20, textvariable=self.modbus_register_var)
+        modbus_register_address_entry.grid(row=row+2, column=col + 1, padx=10, pady=5, sticky="nw")
+        
+        ttk.Label(self.modbus_frame, text="Register value").grid(row=row+3, column=col, sticky="nw", padx=5, pady=2)
+        self.modbus_register_var = tk.StringVar()
+        modbus_register_value_entry = ttk.Entry(self.modbus_frame, width=20, textvariable=self.modbus_register_var)
+        modbus_register_value_entry.grid(row=row+3, column=col + 1, padx=10, pady=5, sticky="nw")
+        
+        buttons_frame = ttk.Frame(self.modbus_frame)
+        buttons_frame.grid(row=row+4, column=col, padx=10, pady=5, sticky="nw")
+        
+        self.modbus_read_register_button = ttk.Button(buttons_frame, text="Read", command=self.force_power_on)
+        self.modbus_read_register_button.pack(side="left", padx=5, pady=0)
+
+        self.force_write_button = ttk.Button(buttons_frame, text="Write", command=self.force_power_off)
+        self.force_write_button.pack(side="left", padx=5, pady=0)
+        
+        self.reset_cycle_count_button = ttk.Button(buttons_frame, text="Reset cycle count", command=self.reset_cycle_count)
+        self.reset_cycle_count_button.pack(side="left", padx=5, pady=0)
+        
+        self.reset_time_count_button = ttk.Button(buttons_frame, text="Reset time count", command=self.reset_cycle_count)
+        self.reset_time_count_button.pack(side="left", padx=5, pady=0)
     
     def on_checkbutton_toggle(self, *args):
         self.config.ssh.enabled = not self.config.ssh.enabled
@@ -906,7 +938,7 @@ class RigolTestApp(tk.Tk):
                     self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
                     continue
                 
-        if not self.test_stopped_intentionally and self.psu_initialized():
+        if not self.test_stopped_intentionally and self.config.connection.psu_enabled:
             self.log("[INFO] Spegnimento finale dell'alimentatore...")
             try:
                 self.psu_poweroff()
