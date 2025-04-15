@@ -26,13 +26,16 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 class TestBenchConnectionConfig:
     psu_address: IPv4Address
+    psu_enabled: bool
 
-    def __init__(self, psu_address: IPv4Address):
+    def __init__(self, psu_address: IPv4Address, psu_enabled: bool):
         self.psu_address = psu_address
+        self.psu_enabled = psu_enabled
     
     def as_dict(self)->dict:
         return {
-            "psu_address": str(self.psu_address)
+            "psu_address": str(self.psu_address),
+            "psu_enabled": str(self.psu_enabled)
         }
 
 class TestBenchSSHConfig:
@@ -95,7 +98,8 @@ class TestBenchConfig:
         
         connection = data["connection"]
         psu_address = ip_address(connection["psu_address"])
-        connection = TestBenchConnectionConfig(psu_address)
+        psu_enabled = connection["psu_enabled"] == "True"
+        connection = TestBenchConnectionConfig(psu_address, psu_enabled)
 
         timing = data["timing"]
         pre_check_delay = float(timing["pre_check_delay"])
@@ -483,6 +487,10 @@ class RigolTestApp(tk.Tk):
         self.config.ssh.command = self.command_var.get()
         self.save_config()
     
+    def on_psu_enable_change(self, *args):
+        self.config.connection.psu_enabled = not self.config.connection.psu_enabled
+        self.save_config()
+    
     # TODO each _var is created inside the loop right above here. Please declare them as class properties
     def on_entry_precheck_change(self, *args):
         if hasattr(self, "entry_precheck_var"):
@@ -548,6 +556,11 @@ class RigolTestApp(tk.Tk):
         self.dp832_entry = ttk.Entry(self.range_frame, width=15)
         self.dp832_entry.insert(0, str(self.config.connection.psu_address))
         self.dp832_entry.grid(row=0, column=1, padx=5)
+        
+        self.psu_enabled = IntVar(master = self.range_frame, value=self.config.connection.psu_enabled)
+        c1 = tk.Checkbutton(self.range_frame, text='Use remote PSU',variable=self.psu_enabled, command=self.on_psu_enable_change)
+        c1.grid(row=1, column=col, padx=10, pady=5, sticky="nw")
+        
     
     def init_ip_table(self, parent, row, col):
         # Frame 5: Tabella IP
@@ -765,8 +778,8 @@ class RigolTestApp(tk.Tk):
         - Utilizza la stringa configurabile per costruire l'URL di verifica.
         """
         
-        # connect to the PSU
-        if not self.config.ssh.enabled:
+        # connect to the PSU only if it's enabled from config
+        if self.config.connection.psu_enabled:
             self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
             try:
                 self.psu_connect()
@@ -789,14 +802,17 @@ class RigolTestApp(tk.Tk):
 
             self.log(f"[INFO] Ciclo {self.cycle_count}")
             
-            # if SSH remote command is not enabled or it is enabled and it's the first cycle, switch on the PSU
-            if not self.config.ssh.enabled:
-                try:
-                    self.psu_poweron()
-                    self.log(f"[INFO] Alimentatore acceso")                    
-                except Exception as e:
-                    self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
-                    continue
+            # if the remote PSU is enabled and SSH is disabled, switch on the PSU
+            # if the remote PSU is enabled and SSH is enabled but it's the first cycle, switch on the PSU
+            # otherwise don't switch on the PSU
+            if self.config.connection.psu_enabled:
+                if not self.config.ssh.enabled or (self.config.ssh.enabled and self.cycle_count == 1):
+                    try:
+                        self.psu_poweron()
+                        self.log(f"[INFO] Alimentatore acceso")                    
+                    except Exception as e:
+                        self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
+                        continue
                         
             # clear detection times and GUI
             for ip in self.urls:
