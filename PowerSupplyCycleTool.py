@@ -707,7 +707,7 @@ class RigolTestApp(tk.Tk):
             # if the remote PSU is enabled and SSH is enabled but it's the first cycle, switch on the PSU
             # otherwise don't switch on the PSU
             if self.config.connection.psu_enabled:
-                if not self.config.ssh.enabled or (self.config.ssh.enabled and self.cycle_count == 1):
+                if not self.config.ssh.enabled or (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
                     try:
                         self.psu_poweron()
                         self.log(f"[INFO] Alimentatore acceso")                    
@@ -868,6 +868,7 @@ class RigolTestApp(tk.Tk):
     
     def reset_cycle_count(self):
         self.cycle_count = 0
+        self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
         ip_list = [ip_from_url(url) for url in self.urls]
         futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
         for ip,future in futures_dict.items():
