@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, scrolledtext
 
 class ModbusFrame(tk.LabelFrame):
     modbus_enable_var: tk.IntVar
@@ -174,19 +174,19 @@ class PsuFrame(tk.LabelFrame):
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
+        # Riga 1: use remote PSU
+        self.psu_enabled = tk.IntVar(self)
+        psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled, command=self.on_psu_enable_change)
+        psu_enabled_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        
         # Riga 0: IP Alimentatore, IP Start e IP End
         psu_ip_label = tk.Label(self, text="IP Alimentatore:")
-        psu_ip_label.grid(row=0, column=0, padx=0, pady=0)
+        psu_ip_label.grid(row=1, column=0, padx=0, pady=0)
         
         self.psu_ip_var = tk.StringVar(self)
         self.psu_ip_var.trace_add("write", self.on_psu_ip_change)
         self.psu_ip = tk.Entry(self, width=15, textvariable=self.psu_ip_var)
-        self.psu_ip.grid(row=0, column=1, padx=0)
-        
-        # Riga 1: use remote PSU
-        self.psu_enabled = tk.IntVar(self)
-        psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled, command=self.on_psu_enable_change)
-        psu_enabled_checkbutton.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+        self.psu_ip.grid(row=1, column=1, padx=0)
     
     def on_psu_ip_change(self, *args):
         pass
@@ -248,6 +248,8 @@ class InfoFrame(tk.LabelFrame):
         self.anomaly_count_label.pack(side="left", padx=5)
 
 class IpTableFrame(tk.LabelFrame):
+    tree: ttk.Treeview
+    
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="IP table")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
@@ -274,3 +276,27 @@ class IpTableFrame(tk.LabelFrame):
         vsb.pack(side='right', fill='y')
 
         self.tree.configure(yscrollcommand=vsb.set)
+
+class FileFrame(tk.LabelFrame):
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="File")
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        
+        self.url_file = scrolledtext.ScrolledText(self)
+        self.url_file.grid(row=0, column=0)
+        self.url_file.config(height=15)
+
+        self.apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
+        self.apply_button.grid(row=1, column=0, padx=0, pady=0)
+    
+    def on_apply_button_press(self):
+        pass
+
+class LogFrame(tk.LabelFrame):
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="Log")
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        
+        self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
+        self.log_text.grid(row=0, column=0, sticky="nsew")
+        self.log_text.config(height=17)

@@ -21,7 +21,7 @@ from paramiko import AuthenticationException, AutoAddPolicy, BadHostKeyException
 from concurrent.futures import Future, ThreadPoolExecutor
 import re
 from pyModbusTCP.client import ModbusClient
-from gui import InfoFrame, IpTableFrame, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
+from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -335,8 +335,8 @@ class RigolTestApp(tk.Tk):
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
         top_right_frame.grid(row=0, column=1, sticky="ne")
-
-        self.init_url_file_frame(top_right_frame, 0, 0)
+        
+        self.file_frame = FileFrame(top_right_frame, 0, 0, 5, 5, "ne")
         
         # BOTTOM FRAME
         bottom_frame = tk.Frame(self)
@@ -356,9 +356,8 @@ class RigolTestApp(tk.Tk):
         # BOTTOM RIGHT FRAME
         bottom_right_frame = tk.Frame(bottom_frame)
         bottom_right_frame.grid(row=0, column=1, sticky="ne")
-
-        self.init_log_frame(bottom_right_frame, 0, 0)
         
+        self.log_frame = LogFrame(bottom_right_frame, 0, 0, 5, 5, "nw")
     
     def init_url_file_frame(self, parent, row, col):
         self.url_file_frame = ttk.Frame(parent)
