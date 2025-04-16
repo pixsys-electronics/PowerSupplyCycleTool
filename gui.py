@@ -1,17 +1,23 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
+from typing import Callable
 
 class ModbusFrame(tk.LabelFrame):
-    modbus_enable_var: tk.IntVar
+    modbus_enable_automatic_cycle_count_var: tk.IntVar
     modbus_register_address_var: tk.StringVar
     modbus_register_value_var: tk.StringVar
+    modbus_enable_change_cb: Callable[[bool], None] | None
+    reset_cycle_count_press_cb: Callable[[None], None] | None
+    on_reset_time_count_press_cb: Callable[[None], None] | None
+    read_register_press_cb: Callable[[None], None] | None
+    write_register_press_cb: Callable[[None], None] | None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="MODBUS")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.modbus_enable_var = tk.IntVar(self, value=False)
-        modbus_enable_checkbutton = tk.Checkbutton(self, text='Enable automatic cycle count check',variable=self.modbus_enable_var, command=self.on_modbus_enable_change)
+        self.modbus_enable_automatic_cycle_count_var = tk.IntVar(self, value=False)
+        modbus_enable_checkbutton = tk.Checkbutton(self, text='Enable automatic cycle count check',variable=self.modbus_enable_automatic_cycle_count_var, command=self.on_modbus_enable_change)
         modbus_enable_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
         
         # ROW1 - register frame
@@ -34,10 +40,10 @@ class ModbusFrame(tk.LabelFrame):
         buttons_frame = tk.Frame(self)
         buttons_frame.grid(row=2, column=0, padx=0, pady=0, sticky="nw")
         
-        modbus_read_register_button = tk.Button(buttons_frame, text="Read", command=self.on_force_poweron_press)
+        modbus_read_register_button = tk.Button(buttons_frame, text="Read", command=self.on_read_register_press)
         modbus_read_register_button.pack(side="left", padx=0, pady=0)
 
-        force_write_button = tk.Button(buttons_frame, text="Write", command=self.on_force_poweroff_press)
+        force_write_button = tk.Button(buttons_frame, text="Write", command=self.on_write_register_press)
         force_write_button.pack(side="left", padx=0, pady=0)
         
         reset_cycle_count_button = tk.Button(buttons_frame, text="Reset cycle count", command=self.on_reset_cycle_count_press)
@@ -46,27 +52,50 @@ class ModbusFrame(tk.LabelFrame):
         reset_time_count_button = tk.Button(buttons_frame, text="Reset time count", command=self.on_reset_time_count_press)
         reset_time_count_button.pack(side="left", padx=0, pady=0)
     
+    def set_modbus_enable(self, value: bool):
+        self.modbus_enable_automatic_cycle_count_var.set(value)
+    
+    def set_modbus_enable_change_cb(self, cb: Callable[[bool], None]):
+        self.modbus_enable_change_cb = cb
+    
+    def set_reset_cycle_count_press_cb(self, cb: Callable[[None], None]):
+        self.reset_cycle_count_press_cb = cb
+    
+    def set_reset_time_count_press_cb(self, cb: Callable[[None], None]):
+        self.reset_time_count_press_cb = cb
+    
+    def set_read_register_press_cb(self, cb: Callable[[None], None]):
+        self.read_register_press_cb = cb
+    
+    def set_write_register_press_cb(self, cb: Callable[[None], None]):
+        self.write_register_press_cb = cb
     
     def on_modbus_enable_change(self, *args):
-        pass
+        value = self.modbus_enable_automatic_cycle_count_var.get()
+        self.modbus_enable_change_cb(value)
     
     def on_reset_cycle_count_press(self):
-        pass
+        self.reset_cycle_count_press_cb()
     
     def on_reset_time_count_press(self):
-        pass
+        self.reset_time_count_press_cb()
     
-    def on_force_poweron_press(self):
-        pass
+    def on_read_register_press(self):
+        self.read_register_press_cb()
     
-    def on_force_poweroff_press(self):
-        pass
+    def on_write_register_press(self):
+        self.write_register_press_cb()
 
 class SSHFrame(tk.LabelFrame):
     ssh_enabled_var: tk.IntVar
     username_var: tk.StringVar
     password_var: tk.StringVar
     command_var: tk.StringVar
+    
+    username_change_cb: Callable[[str], None] | None
+    password_change_cb: Callable[[str], None] | None
+    command_change_cb: Callable[[str], None] | None
+    ssh_enabled_change_cb: Callable[[bool], None] | None
     
     def __init__(self, parent, row, col, padx, pady, sticky): 
         super().__init__(parent, text="SSH")
@@ -105,24 +134,48 @@ class SSHFrame(tk.LabelFrame):
         command = tk.Entry(credentials_frame, width=20, textvariable=self.command_var)
         command.grid(row=2, column=1, padx=0, pady=0, sticky="nw")
     
+    def set_ssh_enabled(self, value: bool):
+        self.ssh_enabled_var.set(value)
+    
+    def set_username_change_cb(self, cb: Callable[[str], None]):
+        self.username_change_cb = cb
+        
+    def set_password_change_cb(self, cb: Callable[[str], None]):
+        self.password_change_cb = cb
+    
+    def set_command_change_cb(self, cb: Callable[[str], None]):
+        self.command_change_cb = cb
+    
+    def set_ssh_enabled_change_cb(self, cb: Callable[[bool], None]):
+        self.ssh_enabled_change_cb = cb
+    
     def on_ssh_enabled_change(self, *args):
-        pass
-    
+        value = self.ssh_enabled_var.get()
+        self.ssh_enabled_change_cb(value)
+        
     def on_username_change(self, *args):
-        pass
-    
+        value = self.username_var.get()
+        self.username_change_cb(value)
+        
     def on_password_change(self, *args):
-        pass
-    
+        value = self.password_var.get()
+        self.password_change_cb(value)
+        
     def on_command_change(self, *args):
-        pass
-
+        value = self.command_var.get()
+        self.command_change_cb(value)
+    
 class TimingFrame(tk.LabelFrame):
     entry_precheck_var: tk.DoubleVar
     entry_checkloop_var: tk.DoubleVar
-    entry_spegn_var: tk.DoubleVar
+    entry_speg_var: tk.DoubleVar
     entry_maxdelay_var: tk.DoubleVar
     entry_cycle_start_var: tk.IntVar
+    precheck_change_cb: Callable[[float], None] | None
+    checkloop_change_cb: Callable[[float], None] | None
+    speg_change_cb: Callable[[float], None] | None
+    maxdelay_change_cb: Callable[[float], None] | None
+    cycle_start_change_cb: Callable[[int], None] | None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Timing")
@@ -150,20 +203,40 @@ class TimingFrame(tk.LabelFrame):
             entry.grid(row=idx, column=1, sticky="w", padx=0, pady=0)
             setattr(self, entry_name, entry)
     
+    def entry_precheck_cb(self, cb: Callable[[float], None]):
+        self.precheck_change_cb = cb
+
+    def entry_checkloop_cb(self, cb: Callable[[float], None]):
+        self.checkloop_change_cb = cb
+
+    def entry_spegn_cb(self, cb: Callable[[float], None]):
+        self.speg_change_cb = cb
+
+    def entry_maxdelay_cb(self, cb: Callable[[float], None]):
+        self.maxdelay_change_cb = cb
+
+    def entry_cycle_start_cb(self, cb: Callable[[int], None]):
+        self.cycle_start_change_cb = cb
+
     def on_entry_precheck_change(self, *args):
-        pass
+        value = self.entry_precheck_var.get()
+        self.entry_precheck_cb(value)
         
     def on_entry_checkloop_change(self, *args):
-        pass        
+        value = self.entry_checkloop_var.get()
+        self.entry_checkloop_cb(value)
     
     def on_entry_speg_change(self, *args):
-        pass    
+        value = self.entry_speg_var.get()
+        self.speg_change_cb(value)
     
     def on_entry_cycle_start_change(self, *args):
-        pass    
+        value = self.entry_cycle_start_var.get()
+        self.entry_cycle_start_cb(value)
         
     def on_entry_maxdelay_change(self, *args):
-        pass    
+        value = self.entry_maxdelay_var.get()
+        self.entry_maxdelay_cb(value)
 
 class PsuFrame(tk.LabelFrame):
     psu_ip_var: tk.StringVar
