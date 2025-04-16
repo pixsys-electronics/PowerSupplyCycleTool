@@ -26,6 +26,19 @@ from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, ManualControlsFram
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
+class Debouncer:
+    def __init__(self, tk_root, delay_ms, callback):
+        self.root = tk_root
+        self.delay = delay_ms
+        self.callback = callback
+        self._job = None
+
+    def call(self, *args, **kwargs):
+        if self._job is not None:
+            self.root.after_cancel(self._job)
+        self._job = self.root.after(self.delay, lambda: self.callback(*args, **kwargs))
+
+
 # Sostituisci con la tua implementazione o libreria effettiva per l'alimentatore Rigol.
 from dp832 import dp832
 
@@ -159,6 +172,7 @@ class RigolTestApp(tk.Tk):
     info_frame: InfoFrame
     ip_frame: IpTableFrame
     log_frame: LogFrame
+    save_config_debouncer: Debouncer
 
     def __init__(self, version):
         super().__init__()
@@ -202,6 +216,8 @@ class RigolTestApp(tk.Tk):
         # Gestione code
         self.after(500, self.process_log_queue)
         self.after(100, self.process_gui_queue)
+        
+        self.save_config_debouncer = Debouncer(self, 500, self.save_config)
 
         # TODO make this configurable from UI
 
@@ -311,59 +327,59 @@ class RigolTestApp(tk.Tk):
     
     def on_ssh_enabled_change(self, value: bool):
         self.config.ssh.enabled = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_ssh_username_change(self, value: str):
         self.config.ssh.username = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_ssh_password_change(self, value: str):
         self.config.ssh.password = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_ssh_command_change(self, value: str):
         self.config.ssh.command = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_psu_enable_change(self, value: bool):
         self.config.connection.psu_enabled = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_psu_ip_change(self, value: str):
         self.config.connection.psu_address = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_timing_precheck_change(self, value: float):
         self.config.timing.pre_check_delay = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_timing_checkloop_change(self, value: float):
         self.config.timing.loop_check_period = value
-        self.save_config()
+        self.save_config_debounced()
 
     def on_timing_speg_change(self, value: float):
         self.config.timing.poweroff_delay = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_timing_cycle_start_change(self, value: int):
         self.config.timing.cycle_start = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_timing_maxdelay_change(self, value: float):
         self.config.timing.max_startup_delay = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_modbus_enable_change(self, value: bool):
         self.config.modbus.automatic_cycle_count_check_enabled = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_modbus_register_address_change(self, value: int):
         self.config.modbus.register_address = value
-        self.save_config()
+        self.save_config_debounced()
     
     def on_modbus_register_value_change(self, value: int):
         self.config.modbus.register_value = value
-        self.save_config()
+        self.save_config_debounced()
 
     def on_modbus_read_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
@@ -491,6 +507,10 @@ class RigolTestApp(tk.Tk):
         data_json = json.dumps(data)
         with open(config_path, mode="w", encoding="utf-8") as file:
             file.write(data_json)
+        print("saved")
+    
+    def save_config_debounced(self):
+        self.save_config_debouncer.call()
     
     def clear_address_table(self):
         self.urls.clear()
