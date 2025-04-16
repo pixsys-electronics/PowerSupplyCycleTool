@@ -16,7 +16,7 @@ class ModbusFrame(tk.LabelFrame):
         super().__init__(parent, text="MODBUS")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.modbus_enable_automatic_cycle_count_var = tk.IntVar(self, value=False)
+        self.modbus_enable_automatic_cycle_count_var = tk.IntVar(self)
         modbus_enable_checkbutton = tk.Checkbutton(self, text='Enable automatic cycle count check',variable=self.modbus_enable_automatic_cycle_count_var, command=self.on_modbus_enable_change)
         modbus_enable_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
         
@@ -53,6 +53,7 @@ class ModbusFrame(tk.LabelFrame):
         reset_time_count_button.pack(side="left", padx=0, pady=0)
     
     def set_modbus_enable(self, value: bool):
+        value = int(value)
         self.modbus_enable_automatic_cycle_count_var.set(value)
     
     def set_modbus_enable_change_cb(self, cb: Callable[[bool], None]):
@@ -73,6 +74,7 @@ class ModbusFrame(tk.LabelFrame):
     def on_modbus_enable_change(self, *args):
         if self.modbus_enable_change_cb is not None:
             value = self.modbus_enable_automatic_cycle_count_var.get()
+            value = value == 1
             self.modbus_enable_change_cb(value)
     
     def on_reset_cycle_count_press(self):
@@ -106,7 +108,7 @@ class SSHFrame(tk.LabelFrame):
         super().__init__(parent, text="SSH")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.ssh_enabled_var = tk.IntVar(self, value=False)
+        self.ssh_enabled_var = tk.IntVar(self)
         
         ssh_enabled_checkbutton = tk.Checkbutton(self, text='Run SSH command on power-off',variable=self.ssh_enabled_var, command=self.on_ssh_enabled_change)
         ssh_enabled_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
@@ -140,6 +142,7 @@ class SSHFrame(tk.LabelFrame):
         command.grid(row=2, column=1, padx=0, pady=0, sticky="nw")
     
     def set_ssh_enabled(self, value: bool):
+        value = int(value)
         self.ssh_enabled_var.set(value)
     
     def set_username(self, value: str):
@@ -166,6 +169,7 @@ class SSHFrame(tk.LabelFrame):
     def on_ssh_enabled_change(self, *args):
         if self.ssh_enabled_change_cb is not None:
             value = self.ssh_enabled_var.get()
+            value = value == 1
             self.ssh_enabled_change_cb(value)
         
     def on_username_change(self, *args):
@@ -305,6 +309,7 @@ class PsuFrame(tk.LabelFrame):
         self.psu_ip_var.set(value)
     
     def set_psu_enabled(self, value: bool):
+        value = int(value)
         self.psu_enabled_var.set(value)
     
     def set_psu_ip_change_cb(self, cb: Callable[[str], None]):
@@ -321,6 +326,7 @@ class PsuFrame(tk.LabelFrame):
     def on_psu_enable_change(self, *args):
         if self.psu_enabled_change_cb is not None:
             value = self.psu_enabled_var.get()
+            value = value == 1
             self.psu_enabled_change_cb(value)
 
 class ManualControlsFrame(tk.LabelFrame):
@@ -474,7 +480,7 @@ class FileFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
         self.file = scrolledtext.ScrolledText(self)
-        self.file.grid(row=0, column=0)
+        self.file.grid(row=0, column=0, sticky="nsew")
         self.file.config(height=15)
 
         apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)

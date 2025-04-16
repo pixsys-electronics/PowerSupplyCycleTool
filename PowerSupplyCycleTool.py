@@ -218,22 +218,22 @@ class RigolTestApp(tk.Tk):
 
         # TOP FRAME
         top_frame = tk.Frame(self)
-        top_frame.grid(row=0, column=0, sticky="new")
+        top_frame.grid(row=0, column=0, sticky="nsew")
         top_frame.grid_rowconfigure(0, weight=1)
         top_frame.grid_columnconfigure(0, weight=1)
         top_frame.grid_columnconfigure(1, weight=1)
 
         # TOP LEFT FRAME
         top_left_frame = tk.Frame(top_frame)
-        top_left_frame.grid(row=0, column=0, sticky="nw")
+        top_left_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nw")
+        self.psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nsew")
         self.psu_frame.set_psu_enabled(self.config.connection.psu_enabled)
         self.psu_frame.set_psu_ip(self.config.connection.psu_address)
         self.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
         self.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
         
-        self.timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nw")
+        self.timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nsew")
         self.timing_frame.set_precheck(self.config.timing.pre_check_delay)
         self.timing_frame.set_checkloop(self.config.timing.loop_check_period)
         self.timing_frame.set_maxdelay(self.config.timing.max_startup_delay)
@@ -246,7 +246,7 @@ class RigolTestApp(tk.Tk):
         self.timing_frame.set_checkloop_cb(self.on_timing_checkloop_change)
         self.timing_frame.set_cycle_start_cb(self.on_timing_cycle_start_change)
         
-        self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nw")
+        self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nsew")
         self.ssh_frame.set_ssh_enabled(self.config.ssh.enabled)
         self.ssh_frame.set_username(self.config.ssh.username)
         self.ssh_frame.set_password(self.config.ssh.password)
@@ -257,14 +257,14 @@ class RigolTestApp(tk.Tk):
         self.ssh_frame.set_password_change_cb(self.on_ssh_password_change)
         self.ssh_frame.set_command_change_cb(self.on_ssh_command_change)
         
-        self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nw")
+        self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nsew")
         self.modbus_frame.set_modbus_enable(True)
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
-        top_right_frame.grid(row=0, column=1, sticky="ne")
+        top_right_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.file_frame = FileFrame(top_right_frame, 0, 0, 5, 5, "ne")
+        self.file_frame = FileFrame(top_right_frame, 0, 0, 5, 5, "nsew")
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path) as f: content = f.read()
         self.file_frame.load_text(content)
@@ -272,30 +272,30 @@ class RigolTestApp(tk.Tk):
         
         # BOTTOM FRAME
         bottom_frame = tk.Frame(self)
-        bottom_frame.grid(row=1, column=0, sticky="new")
+        bottom_frame.grid(row=1, column=0, sticky="nsew")
         bottom_frame.grid_rowconfigure(0, weight=1)
         bottom_frame.grid_columnconfigure(0, weight=1)
         bottom_frame.grid_columnconfigure(1, weight=1)
 
         # BOTTOM LEFT FRAME
         bottom_left_frame = tk.Frame(bottom_frame)
-        bottom_left_frame.grid(row=0, column=0, sticky="nw")
+        bottom_left_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.manual_controls_frame = ManualControlsFrame(bottom_left_frame, 0, 0, 5, 5, "nw")
+        self.manual_controls_frame = ManualControlsFrame(bottom_left_frame, 0, 0, 5, 5, "nsew")
         self.manual_controls_frame.set_start_button_press_cb(self.on_commands_start_test)
         self.manual_controls_frame.set_stop_button_press_cb(self.on_commands_stop_test)
         self.manual_controls_frame.set_pause_button_press_cb(self.on_commands_toggle_pause)
         self.manual_controls_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
         self.manual_controls_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
         
-        self.info_frame = InfoFrame(bottom_left_frame, 1, 0, 5, 5, "nw")
-        self.ip_frame = IpTableFrame(bottom_left_frame, 2, 0, 5, 5, "nw")
+        self.info_frame = InfoFrame(bottom_left_frame, 1, 0, 5, 5, "nsew")
+        self.ip_frame = IpTableFrame(bottom_left_frame, 2, 0, 5, 5, "nsew")
         
         # BOTTOM RIGHT FRAME
         bottom_right_frame = tk.Frame(bottom_frame)
-        bottom_right_frame.grid(row=0, column=1, sticky="ne")
+        bottom_right_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.log_frame = LogFrame(bottom_right_frame, 0, 0, 5, 5, "nw")
+        self.log_frame = LogFrame(bottom_right_frame, 0, 0, 5, 5, "nsew")
     
     def on_ssh_enabled_change(self, value: bool):
         self.config.ssh.enabled = value
@@ -459,7 +459,10 @@ class RigolTestApp(tk.Tk):
                 gui_msg = self.gui_queue.get_nowait()
                 if gui_msg[0] == 'update_label':
                     _, label_name, text = gui_msg
-                    getattr(self, label_name).config(text=text)
+                    if label_name == 'anomaly_count_label':
+                        self.info_frame.set_anomaly_count_label(text)
+                    elif label_name == 'cycle_count_label':
+                        self.info_frame.set_cycle_count_label(text)
                 elif gui_msg[0] == 'update_tree':
                     ip, detected_time = gui_msg[1], gui_msg[2]
                     self.ip_frame.tree_set(ip, "detected", detected_time)
