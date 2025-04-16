@@ -258,7 +258,12 @@ class RigolTestApp(tk.Tk):
         self.ssh_frame.set_command_change_cb(self.on_ssh_command_change)
         
         self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nsew")
-        self.modbus_frame.set_modbus_enable(True)
+        self.modbus_frame.set_modbus_enable(self.config.modbus.automatic_cycle_count_check_enabled)
+        self.modbus_frame.set_register_address(self.config.modbus.register_address)
+        self.modbus_frame.set_register_value(self.config.modbus.register_value)
+        self.modbus_frame.set_modbus_enable_change_cb(self.on_modbus_enable_change)
+        self.modbus_frame.set_register_address_change_cb(self.on_modbus_register_address_change)
+        self.modbus_frame.set_register_value_change_cb(self.on_modbus_register_value_change)
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
@@ -341,6 +346,20 @@ class RigolTestApp(tk.Tk):
         self.config.timing.max_startup_delay = value
         self.save_config()
     
+    def on_modbus_enable_change(self, value: bool):
+        self.config.modbus.automatic_cycle_count_check_enabled = value
+        self.save_config()
+    
+    def on_modbus_register_address_change(self, value: int):
+        print(value)
+        self.config.modbus.register_address = value
+        self.save_config()
+    
+    def on_modbus_register_value_change(self, value: int):
+        self.config.modbus.register_value = value
+        print(value)
+        self.save_config()
+            
     def on_commands_start_test(self):
         """Avvia il test in un thread separato, reimpostando contatori e flag."""
         if not self.run_test:
@@ -413,7 +432,7 @@ class RigolTestApp(tk.Tk):
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path, mode="w", encoding="utf-8") as file:
             file.write(content)
-    
+        
     def save_config(self):
         config_path = os.path.join(os.getcwd(), self.config_filename)
         data = self.config.as_dict()

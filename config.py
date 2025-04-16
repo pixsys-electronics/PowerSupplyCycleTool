@@ -30,9 +30,9 @@ class TestBenchSSHConfig:
     
     def as_dict(self)->dict:
         return {
-            "username": str(self.username),
-            "password": str(self.password),
-            "command": str(self.command),
+            "username": self.username,
+            "password": self.password,
+            "command": self.command,
             "enabled": str(self.enabled),
         }
 
@@ -59,16 +59,34 @@ class TestBenchTimingConfig:
             "cycle_start": self.cycle_start
         }
 
+class TestBenchModbusConfig:
+    automatic_cycle_count_check_enabled: bool
+    register_address: int
+    register_value: int
+    
+    def __init__(self, automatic_cycle_count_check_enabled: bool, register_address: int, register_value: int):
+        self.automatic_cycle_count_check_enabled = automatic_cycle_count_check_enabled
+        self.register_address = register_address
+        self.register_value = register_value
+    
+    def as_dict(self)->dict:
+        return {
+            "automatic_cycle_count_check_enabled": str(self.automatic_cycle_count_check_enabled),
+            "register_address": self.register_address,
+            "register_value": self.register_value,
+        }
 
 class TestBenchConfig:
     connection: TestBenchConnectionConfig
     timing: TestBenchTimingConfig
     ssh: TestBenchSSHConfig
+    modbus: TestBenchModbusConfig
 
-    def __init__(self, connection: TestBenchConnectionConfig, timing: TestBenchTimingConfig, ssh: TestBenchSSHConfig):
+    def __init__(self, connection: TestBenchConnectionConfig, timing: TestBenchTimingConfig, ssh: TestBenchSSHConfig, modbus: TestBenchModbusConfig):
         self.connection = connection
         self.timing = timing
         self.ssh = ssh
+        self.modbus = modbus
     
     @staticmethod
     def from_json(file_path: str):
@@ -96,14 +114,22 @@ class TestBenchConfig:
         enabled = ssh["enabled"] == "True"
         
         ssh = TestBenchSSHConfig(username, password, command, enabled)
+        
+        modbus = data["modbus"]
+        automatic_cycle_count_check_enabled = modbus["automatic_cycle_count_check_enabled"] == "True"
+        register_address = int(modbus["register_address"])
+        register_value = int(modbus["register_value"])
+        
+        modbus = TestBenchModbusConfig(automatic_cycle_count_check_enabled, register_address, register_value)
 
-        return TestBenchConfig(connection, timing, ssh)
+        return TestBenchConfig(connection, timing, ssh, modbus)
 
     def as_dict(self) -> dict:
         return {
             "connection": self.connection.as_dict(),
             "timing": self.timing.as_dict(),
-            "ssh": self.ssh.as_dict()
+            "ssh": self.ssh.as_dict(),
+            "modbus": self.modbus.as_dict(),
         }
 
 def config_from_json(file_path: str):

@@ -4,9 +4,12 @@ from typing import Callable
 
 class ModbusFrame(tk.LabelFrame):
     modbus_enable_automatic_cycle_count_var: tk.IntVar
-    modbus_register_address_var: tk.StringVar
-    modbus_register_value_var: tk.StringVar
+    modbus_register_address_var: tk.IntVar
+    modbus_register_value_var: tk.IntVar
     modbus_enable_change_cb: Callable[[bool], None] | None = None
+    modbus_register_address_change_cb: Callable[[int], None] | None = None
+    modbus_register_value_change_cb: Callable[[int], None] | None = None
+    
     reset_cycle_count_press_cb: Callable[[], None] | None = None
     on_reset_time_count_press_cb: Callable[[], None] | None = None
     read_register_press_cb: Callable[[], None] | None = None
@@ -26,13 +29,15 @@ class ModbusFrame(tk.LabelFrame):
         
         modbus_register_address_label = tk.Label(register_frame, text="Register address")
         modbus_register_address_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
-        self.modbus_register_address_var = tk.StringVar()
+        self.modbus_register_address_var = tk.IntVar()
+        self.modbus_register_address_var.trace_add("write", self.on_register_address_change)
         modbus_register_address_entry = tk.Entry(register_frame, width=20, textvariable=self.modbus_register_address_var)
         modbus_register_address_entry.grid(row=0, column=1, padx=0, pady=0, sticky="nw")
         
         register_value_label = tk.Label(register_frame, text="Register value")
         register_value_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
-        self.modbus_register_value_var = tk.StringVar()
+        self.modbus_register_value_var = tk.IntVar()
+        self.modbus_register_value_var.trace_add("write", self.on_register_value_change)
         modbus_register_value_entry = tk.Entry(register_frame, width=20, textvariable=self.modbus_register_value_var)
         modbus_register_value_entry.grid(row=1, column=1, padx=0, pady=0, sticky="nw")
         
@@ -56,8 +61,20 @@ class ModbusFrame(tk.LabelFrame):
         value = int(value)
         self.modbus_enable_automatic_cycle_count_var.set(value)
     
+    def set_register_address(self, value: int):
+        self.modbus_register_address_var.set(value)
+    
+    def set_register_value(self, value: int):
+        self.modbus_register_value_var.set(value)
+    
     def set_modbus_enable_change_cb(self, cb: Callable[[bool], None]):
         self.modbus_enable_change_cb = cb
+        
+    def set_register_address_change_cb(self, cb: Callable[[int], None]):
+        self.modbus_register_address_change_cb = cb
+    
+    def set_register_value_change_cb(self, cb: Callable[[int], None]):
+        self.modbus_register_value_change_cb = cb
     
     def set_reset_cycle_count_press_cb(self, cb: Callable[[], None]):
         self.reset_cycle_count_press_cb = cb
@@ -76,6 +93,16 @@ class ModbusFrame(tk.LabelFrame):
             value = self.modbus_enable_automatic_cycle_count_var.get()
             value = value == 1
             self.modbus_enable_change_cb(value)
+    
+    def on_register_address_change(self, *args):
+        if self.modbus_register_address_change_cb is not None:
+            value = self.modbus_register_address_var.get()
+            self.modbus_register_address_change_cb(value)
+    
+    def on_register_value_change(self, *args):
+        if self.modbus_register_value_change_cb is not None:
+            value = self.modbus_register_value_var.get()
+            self.modbus_register_value_change_cb(value)
     
     def on_reset_cycle_count_press(self):
         if self.reset_cycle_count_press_cb is not None:
