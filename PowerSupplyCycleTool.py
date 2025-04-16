@@ -720,32 +720,35 @@ class RigolTestApp(tk.Tk):
             ip_list = [ip_from_url(url) for url in self.urls]
             
             # check if everyone has the same cycle count reading from registers using MODBUS protocol
-            futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
-            cycle_count_failure = False
-            for ip,future in futures_dict.items():
-                try:
-                    regs = future.result()
-                    if regs is None:
-                        self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
-                        continue
-                    counter = regs[0]
-                    if counter != self.cycle_count:
-                        self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
+            if self.config.modbus.automatic_cycle_count_check_enabled:
+                futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+                cycle_count_failure = False
+                for ip,future in futures_dict.items():
+                    try:
+                        regs = future.result()
+                        if regs is None:
+                            self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                            continue
+                        counter = regs[0]
+                        if counter != self.cycle_count:
+                            self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
+                            cycle_count_failure = True
+                            break
+
+                        self.log(f"[INFO] {str(ip)} cycle count is up-to-date")
+                        
+                    except Exception as e:
+                        self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
                         cycle_count_failure = True
                         break
-
-                    self.log(f"[INFO] {str(ip)} cycle count is up-to-date")
-                    
-                except Exception as e:
-                    self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
-                    cycle_count_failure = True
+                
+                # if something went wrong during the cycle count check, byee
+                if cycle_count_failure:
                     break
-            
-            # if something went wrong during the cycle count check, byee
-            if cycle_count_failure:
-                break
+                
             
             if self.config.ssh.enabled:
+                ssh_failure = False
                 self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
                 if not self.wait_with_stop_check(5):
                     break
@@ -758,32 +761,46 @@ class RigolTestApp(tk.Tk):
                         self.log(f"[INFO] SSH command succesfully sent to {str(ip)}")
                     except BadHostKeyException as e:
                         self.log(f"[ERROR] Bad host key: {e}")
+                        ssh_failure = True
+                        break
                     except AuthenticationException as e:
                         self.log(f"[ERROR] Authentication exception: {e}")
+                        ssh_failure = True
+                        break
                     except socket.error as e:
                         self.log(f"[ERROR] socket error: {e}")
+                        ssh_failure = True
+                        break
                     except SSHException as e:
                         self.log(f"[ERROR] SSH exception: {e}")
+                        ssh_failure = True
+                        break
                     except Exception as e:
                         self.log(f"[ERROR] Generic error: {e}")
+                        ssh_failure = True
+                        break
                 
+                if ssh_failure:
+                    break
+
                 if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
                         break
             
-            else:    
-                self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
-                if not self.wait_with_stop_check(5):
-                    break
-
-                self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
-                try:
-                    self.psu_poweroff()
-                    self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
-                    if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
+            else:
+                if self.config.connection.psu_enabled:
+                    self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
+                    if not self.wait_with_stop_check(5):
                         break
-                except Exception as e:
-                    self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
-                    continue
+
+                    self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
+                    try:
+                        self.psu_poweroff()
+                        self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
+                        if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
+                            break
+                    except Exception as e:
+                        self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
+                        break
                 
         if not self.test_stopped_intentionally and self.config.connection.psu_enabled:
             self.log("[INFO] Spegnimento finale dell'alimentatore...")
