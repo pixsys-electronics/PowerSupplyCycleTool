@@ -96,13 +96,19 @@ class ModbusFrame(tk.LabelFrame):
     
     def on_register_address_change(self, *args):
         if self.modbus_register_address_change_cb is not None:
-            value = self.modbus_register_address_var.get()
-            self.modbus_register_address_change_cb(value)
+            try:
+                value = self.modbus_register_address_var.get()
+                self.modbus_register_address_change_cb(value)
+            except:
+                pass
     
     def on_register_value_change(self, *args):
         if self.modbus_register_value_change_cb is not None:
-            value = self.modbus_register_value_var.get()
-            self.modbus_register_value_change_cb(value)
+            try:
+                value = self.modbus_register_value_var.get()
+                self.modbus_register_value_change_cb(value)
+            except:
+                pass
     
     def on_reset_cycle_count_press(self):
         if self.reset_cycle_count_press_cb is not None:
@@ -284,28 +290,41 @@ class TimingFrame(tk.LabelFrame):
 
     def on_precheck_change(self, *args):
         if self.precheck_change_cb is not None:
-            value = self.precheck_var.get()
-            self.precheck_change_cb(value)
+            try:
+                value = self.precheck_var.get()
+                self.precheck_change_cb(value)
+            except:
+                pass
         
     def on_checkloop_change(self, *args):
         if self.checkloop_change_cb is not None:
-            value = self.checkloop_var.get()
-            self.checkloop_change_cb(value)
-    
+            try:
+                value = self.checkloop_var.get()
+                self.checkloop_change_cb(value)
+            except:
+                pass
     def on_speg_change(self, *args):
         if self.speg_change_cb is not None:
-            value = self.speg_var.get()
-            self.speg_change_cb(value)
-    
+            try:
+                value = self.speg_var.get()
+                self.speg_change_cb(value)
+            except:
+                pass
     def on_cycle_start_change(self, *args):
         if self.cycle_start_change_cb is not None:
-            value = self.cycle_start_var.get()
-            self.cycle_start_change_cb(value)
-        
+            try:
+                value = self.cycle_start_var.get()
+                self.cycle_start_change_cb(value)
+            except:
+                pass
+    
     def on_maxdelay_change(self, *args):
         if self.maxdelay_change_cb is not None:
-            value = self.maxdelay_var.get()
-            self.maxdelay_change_cb(value)
+            try:
+                value = self.maxdelay_var.get()
+                self.maxdelay_change_cb(value)
+            except:
+                pass
 
 class PsuFrame(tk.LabelFrame):
     psu_ip_var: tk.StringVar
