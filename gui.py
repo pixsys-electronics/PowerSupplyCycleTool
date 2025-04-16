@@ -7,10 +7,10 @@ class ModbusFrame(tk.LabelFrame):
     modbus_register_address_var: tk.StringVar
     modbus_register_value_var: tk.StringVar
     modbus_enable_change_cb: Callable[[bool], None] | None
-    reset_cycle_count_press_cb: Callable[[None], None] | None
-    on_reset_time_count_press_cb: Callable[[None], None] | None
-    read_register_press_cb: Callable[[None], None] | None
-    write_register_press_cb: Callable[[None], None] | None
+    reset_cycle_count_press_cb: Callable[[], None] | None
+    on_reset_time_count_press_cb: Callable[[], None] | None
+    read_register_press_cb: Callable[[], None] | None
+    write_register_press_cb: Callable[[], None] | None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="MODBUS")
@@ -58,16 +58,16 @@ class ModbusFrame(tk.LabelFrame):
     def set_modbus_enable_change_cb(self, cb: Callable[[bool], None]):
         self.modbus_enable_change_cb = cb
     
-    def set_reset_cycle_count_press_cb(self, cb: Callable[[None], None]):
+    def set_reset_cycle_count_press_cb(self, cb: Callable[[], None]):
         self.reset_cycle_count_press_cb = cb
     
-    def set_reset_time_count_press_cb(self, cb: Callable[[None], None]):
+    def set_reset_time_count_press_cb(self, cb: Callable[[], None]):
         self.reset_time_count_press_cb = cb
     
-    def set_read_register_press_cb(self, cb: Callable[[None], None]):
+    def set_read_register_press_cb(self, cb: Callable[[], None]):
         self.read_register_press_cb = cb
     
-    def set_write_register_press_cb(self, cb: Callable[[None], None]):
+    def set_write_register_press_cb(self, cb: Callable[[], None]):
         self.write_register_press_cb = cb
     
     def on_modbus_enable_change(self, *args):
@@ -241,6 +241,8 @@ class TimingFrame(tk.LabelFrame):
 class PsuFrame(tk.LabelFrame):
     psu_ip_var: tk.StringVar
     psu_enabled_var: tk.IntVar
+    psu_ip_change_cb: Callable[[str], None] | None
+    psu_enabled_change_cb: Callable[[bool], None] | None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="PSU")
@@ -261,52 +263,84 @@ class PsuFrame(tk.LabelFrame):
         self.psu_ip = tk.Entry(self, width=15, textvariable=self.psu_ip_var)
         self.psu_ip.grid(row=1, column=1, padx=0)
     
+    def set_psu_ip_change_cb(self, cb: Callable[[str], None]):
+        self.psu_ip_change_cb = cb
+    
+    def set_psu_enabled_change_cb(self, cb: Callable[[str], None]):
+        self.psu_enabled_change_cb = cb
+    
     def on_psu_ip_change(self, *args):
-        pass
+        value = self.psu_ip_var.get()
+        self.psu_ip_change_cb(value)
 
     def on_psu_enable_change(self, *args):
-        pass
+        value = self.psu_enabled_var.get()
+        self.psu_enabled_change_cb(value)
 
 class ManualControlsFrame(tk.LabelFrame):
+    start_button_press_cb: Callable[[], None] | None
+    stop_button_press_cb: Callable[[], None] | None
+    pause_button_press_cb: Callable[[], None] | None
+    force_on_button_press_cb: Callable[[], None] | None
+    force_off_button_press_cb: Callable[[], None] | None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Controlli Manuali")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
-        self.start_button = tk.Button(self, text="Start", command=self.on_start_button_press)
-        self.start_button.pack(side="left", padx=0, pady=0)
+        start_button = tk.Button(self, text="Start", command=self.on_start_button_press)
+        start_button.pack(side="left", padx=0, pady=0)
 
-        self.stop_button = tk.Button(self, text="Stop", command=self.on_stop_button_press)
-        self.stop_button.pack(side="left", padx=0, pady=0)
+        stop_button = tk.Button(self, text="Stop", command=self.on_stop_button_press)
+        stop_button.pack(side="left", padx=0, pady=0)
 
-        self.pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
-        self.pause_button.pack(side="left", padx=0, pady=0)
+        pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
+        pause_button.pack(side="left", padx=0, pady=0)
 
-        self.force_on_button = tk.Button(self, text="Forza ON", command=self.on_force_poweron_button_press)
-        self.force_on_button.pack(side="left", padx=0, pady=0)
+        force_on_button = tk.Button(self, text="Forza ON", command=self.on_force_poweron_button_press)
+        force_on_button.pack(side="left", padx=0, pady=0)
 
-        self.force_off_button = tk.Button(self, text="Forza OFF", command=self.on_force_poweronff_button_press)
-        self.force_off_button.pack(side="left", padx=0, pady=0)
+        force_off_button = tk.Button(self, text="Forza OFF", command=self.on_force_poweronff_button_press)
+        force_off_button.pack(side="left", padx=0, pady=0)
 
-        self.pause_status_label = tk.Label(self, text="Stato: In esecuzione")
-        self.pause_status_label.pack(side="left", padx=0, pady=0)
+        pause_status_label = tk.Label(self, text="Stato: In esecuzione")
+        pause_status_label.pack(side="left", padx=0, pady=0)
+    
+    def set_start_button_press_cb(self, cb: Callable[[], None]):
+        self.start_button_press_cb = cb
+   
+    def set_stop_button_press_cb(self, cb: Callable[[], None]):
+        self.stop_button_press_cb = cb
+   
+    def set_pause_button_press_cb(self, cb: Callable[[], None]):
+        self.pause_button_press_cb = cb
+   
+    def set_force_on_button_press_cb(self, cb: Callable[[], None]):
+        self.force_on_button_press_cb = cb
+   
+    def set_force_off_button_press_cb(self, cb: Callable[[], None]):
+        self.force_off_button_press_cb = cb
     
     def on_start_button_press(self):
-        pass
+        self.start_button_press_cb()
     
     def on_stop_button_press(self):
-        pass
+        self.stop_button_press_cb()
     
     def on_pause_button_press(self):
-        pass
+        self.pause_button_press_cb()
     
     def on_force_poweron_button_press(self):
-        pass
+        self.force_on_button_press_cb()
     
     def on_force_poweronff_button_press(self):
-        pass
+        self.force_off_button_press_cb()
 
 class InfoFrame(tk.LabelFrame):
+    elapsed_time_label: tk.Label
+    cycle_count_label: tk.Label
+    anomaly_count_label: tk.Label
+    
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Info")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
@@ -319,6 +353,15 @@ class InfoFrame(tk.LabelFrame):
 
         self.anomaly_count_label = tk.Label(self, text="Accensioni con anomalia: 0")
         self.anomaly_count_label.pack(side="left", padx=5)
+    
+    def set_elapsed_time_label(self, value: str):
+        self.elapsed_time_label.configure(text=value)
+    
+    def set_cycle_count_label(self, value: str):
+        self.cycle_count_label.configure(text=value)
+    
+    def set_anomaly_count_label(self, value: str):
+        self.anomaly_count_label.configure(text=value)
 
 class IpTableFrame(tk.LabelFrame):
     tree: ttk.Treeview
@@ -349,23 +392,50 @@ class IpTableFrame(tk.LabelFrame):
         vsb.pack(side='right', fill='y')
 
         self.tree.configure(yscrollcommand=vsb.set)
+    
+    def tree_clear(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+    
+    def tree_set(self, ip: str, label: str, time: str):
+        self.tree.set(ip, label, time)
+    
+    def tree_item(self, ip: str, tags):
+        self.tree.item(ip, tags=tags)
+    
+    def tree_insert(self, ip: str, values, tags):
+        self.tree.insert("", tk.END, iid=ip, values=values, tags=tags)
 
 class FileFrame(tk.LabelFrame):
+    file: scrolledtext.ScrolledText
+    apply_button_press_cb: Callable[[], None] | None
+    
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="File")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.url_file = scrolledtext.ScrolledText(self)
-        self.url_file.grid(row=0, column=0)
-        self.url_file.config(height=15)
+        self.file = scrolledtext.ScrolledText(self)
+        self.file.grid(row=0, column=0)
+        self.file.config(height=15)
 
-        self.apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
-        self.apply_button.grid(row=1, column=0, padx=0, pady=0)
+        apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
+        apply_button.grid(row=1, column=0, padx=0, pady=0)
+    
+    def set_apply_button_press_cb(self, cb: Callable[[], None]):
+        self.apply_button_press_cb = cb
     
     def on_apply_button_press(self):
-        pass
+        self.apply_button_press_cb()
+    
+    def load_text(self, content: str):
+        self.file.insert('1.0', content)
+    
+    def get_text(self):
+        return self.file.get("1.0", "end-1c")
 
 class LogFrame(tk.LabelFrame):
+    log_text: scrolledtext.ScrolledText
+    
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Log")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
@@ -373,3 +443,9 @@ class LogFrame(tk.LabelFrame):
         self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
         self.log_text.grid(row=0, column=0, sticky="nsew")
         self.log_text.config(height=17)
+    
+    def add_log(self, msg: str):
+        self.log_text.insert(tk.END, msg + "\n")
+    
+    def scroll_down(self):
+        self.log_text.see(tk.END)

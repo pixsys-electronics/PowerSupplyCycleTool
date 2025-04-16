@@ -221,7 +221,9 @@ class RigolTestApp(tk.Tk):
         self.psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nw")
         self.timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nw")
         self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nw")
+        
         self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nw")
+        self.modbus_frame.set_modbus_enable(True)
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
