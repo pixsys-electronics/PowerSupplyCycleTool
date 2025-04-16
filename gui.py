@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 
 class ModbusFrame(tk.LabelFrame):
     modbus_enable_var: tk.IntVar
@@ -166,6 +167,7 @@ class TimingFrame(tk.LabelFrame):
 
 class PsuFrame(tk.LabelFrame):
     psu_ip_var: tk.StringVar
+    psu_enabled_var: tk.IntVar
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="PSU")
@@ -191,3 +193,84 @@ class PsuFrame(tk.LabelFrame):
 
     def on_psu_enable_change(self, *args):
         pass
+
+class ManualControlsFrame(tk.LabelFrame):
+    
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="Controlli Manuali")
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+
+        self.start_button = tk.Button(self, text="Start", command=self.on_start_button_press)
+        self.start_button.pack(side="left", padx=0, pady=0)
+
+        self.stop_button = tk.Button(self, text="Stop", command=self.on_stop_button_press)
+        self.stop_button.pack(side="left", padx=0, pady=0)
+
+        self.pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
+        self.pause_button.pack(side="left", padx=0, pady=0)
+
+        self.force_on_button = tk.Button(self, text="Forza ON", command=self.on_force_poweron_button_press)
+        self.force_on_button.pack(side="left", padx=0, pady=0)
+
+        self.force_off_button = tk.Button(self, text="Forza OFF", command=self.on_force_poweronff_button_press)
+        self.force_off_button.pack(side="left", padx=0, pady=0)
+
+        self.pause_status_label = tk.Label(self, text="Stato: In esecuzione")
+        self.pause_status_label.pack(side="left", padx=0, pady=0)
+    
+    def on_start_button_press(self):
+        pass
+    
+    def on_stop_button_press(self):
+        pass
+    
+    def on_pause_button_press(self):
+        pass
+    
+    def on_force_poweron_button_press(self):
+        pass
+    
+    def on_force_poweronff_button_press(self):
+        pass
+
+class InfoFrame(tk.LabelFrame):
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="Info")
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+
+        self.elapsed_time_label = tk.Label(self, text="Test non ancora partito.")
+        self.elapsed_time_label.pack(side="left", padx=5)
+
+        self.cycle_count_label = tk.Label(self, text="Accensioni eseguite: 0")
+        self.cycle_count_label.pack(side="left", padx=5)
+
+        self.anomaly_count_label = tk.Label(self, text="Accensioni con anomalia: 0")
+        self.anomaly_count_label.pack(side="left", padx=5)
+
+class IpTableFrame(tk.LabelFrame):
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="IP table")
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+
+        columns = ("ip", "detected")
+        self.tree = ttk.Treeview(self, columns=columns, show="headings")
+        self.tree.heading("ip", text="Indirizzo IP")
+        self.tree.heading("detected", text="Rilevato alle (HH:MM:SS)")
+        self.tree.column("ip", width=200)
+        self.tree.column("detected", width=300)
+
+        # Definizione dei tag per la Treeview
+        self.tree.tag_configure('error', foreground='red')
+        self.tree.tag_configure('normal', foreground='black')
+
+        # Set fixed height (for example, 10 rows max visible)
+        self.tree.config(height=10)
+
+        # Pack Treeview with fill='y' so it adjusts to the height
+        self.tree.pack(side='left', fill='both', expand=True)
+
+        # Scrollbar
+        vsb = tk.Scrollbar(self, orient="vertical", command=self.tree.yview)
+        vsb.pack(side='right', fill='y')
+
+        self.tree.configure(yscrollcommand=vsb.set)
