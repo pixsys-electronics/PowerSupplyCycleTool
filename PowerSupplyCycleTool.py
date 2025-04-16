@@ -151,10 +151,10 @@ def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, re
     
     return future_results
 
-def broadcast_modbus_read_poweron_counter(ip_list) -> dict[IPv4Address, Future[list | None]]:
+def broadcast_modbus_read_poweron_counter(ip_list: list[IPv4Address]) -> dict[IPv4Address, Future[list | None]]:
     return broadcast_modbus_read_register(ip_list, 0, 1)
 
-def broadcast_modbus_write_poweron_counter(ip_list, reg_value: int) -> dict[IPv4Address, Future[bool]]:
+def broadcast_modbus_write_poweron_counter(ip_list: list[IPv4Address], reg_value: int) -> dict[IPv4Address, Future[bool]]:
     return broadcast_modbus_write_register(ip_list, 0, reg_value)
 
 class RigolTestApp(tk.Tk):
@@ -383,6 +383,7 @@ class RigolTestApp(tk.Tk):
 
     def on_modbus_read_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_read_register(ip_list, self.config.modbus.register_address, 1)
         for ip,future in futures_dict.items():
                 try:
@@ -398,6 +399,7 @@ class RigolTestApp(tk.Tk):
 
     def on_modbus_write_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_write_register(ip_list, self.config.modbus.register_address, self.config.modbus.register_value)
         for ip,future in futures_dict.items():
             try:
@@ -412,6 +414,7 @@ class RigolTestApp(tk.Tk):
 
     def on_modbus_reset_cycle_count_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
         for ip,future in futures_dict.items():
             try:
@@ -740,6 +743,7 @@ class RigolTestApp(tk.Tk):
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             
             ip_list = [ip_from_url(url) for url in self.urls]
+            ip_list = [ip for ip in ip_list if ip is not None]
             
             # check if everyone has the same cycle count reading from registers using MODBUS protocol
             if self.config.modbus.automatic_cycle_count_check_enabled:
@@ -870,6 +874,7 @@ class RigolTestApp(tk.Tk):
         self.cycle_count = 0
         self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
         ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
         for ip,future in futures_dict.items():
             try:
