@@ -6,11 +6,11 @@ class ModbusFrame(tk.LabelFrame):
     modbus_enable_automatic_cycle_count_var: tk.IntVar
     modbus_register_address_var: tk.StringVar
     modbus_register_value_var: tk.StringVar
-    modbus_enable_change_cb: Callable[[bool], None] | None
-    reset_cycle_count_press_cb: Callable[[], None] | None
-    on_reset_time_count_press_cb: Callable[[], None] | None
-    read_register_press_cb: Callable[[], None] | None
-    write_register_press_cb: Callable[[], None] | None
+    modbus_enable_change_cb: Callable[[bool], None] | None = None
+    reset_cycle_count_press_cb: Callable[[], None] | None = None
+    on_reset_time_count_press_cb: Callable[[], None] | None = None
+    read_register_press_cb: Callable[[], None] | None = None
+    write_register_press_cb: Callable[[], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="MODBUS")
@@ -71,20 +71,25 @@ class ModbusFrame(tk.LabelFrame):
         self.write_register_press_cb = cb
     
     def on_modbus_enable_change(self, *args):
-        value = self.modbus_enable_automatic_cycle_count_var.get()
-        self.modbus_enable_change_cb(value)
+        if self.modbus_enable_change_cb is not None:
+            value = self.modbus_enable_automatic_cycle_count_var.get()
+            self.modbus_enable_change_cb(value)
     
     def on_reset_cycle_count_press(self):
-        self.reset_cycle_count_press_cb()
+        if self.reset_cycle_count_press_cb is not None:
+            self.reset_cycle_count_press_cb()
     
     def on_reset_time_count_press(self):
-        self.reset_time_count_press_cb()
+        if self.reset_time_count_press_cb is not None:
+            self.reset_time_count_press_cb()
     
     def on_read_register_press(self):
-        self.read_register_press_cb()
+        if self.read_register_press_cb is not None:
+            self.read_register_press_cb()
     
     def on_write_register_press(self):
-        self.write_register_press_cb()
+        if self.write_register_press_cb is not None:
+            self.write_register_press_cb()
 
 class SSHFrame(tk.LabelFrame):
     ssh_enabled_var: tk.IntVar
@@ -92,10 +97,10 @@ class SSHFrame(tk.LabelFrame):
     password_var: tk.StringVar
     command_var: tk.StringVar
     
-    username_change_cb: Callable[[str], None] | None
-    password_change_cb: Callable[[str], None] | None
-    command_change_cb: Callable[[str], None] | None
-    ssh_enabled_change_cb: Callable[[bool], None] | None
+    username_change_cb: Callable[[str], None] | None = None
+    password_change_cb: Callable[[str], None] | None = None
+    command_change_cb: Callable[[str], None] | None = None
+    ssh_enabled_change_cb: Callable[[bool], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky): 
         super().__init__(parent, text="SSH")
@@ -137,6 +142,15 @@ class SSHFrame(tk.LabelFrame):
     def set_ssh_enabled(self, value: bool):
         self.ssh_enabled_var.set(value)
     
+    def set_username(self, value: str):
+        self.username_var.set(value)
+
+    def set_password(self, value: str):
+        self.password_var.set(value)
+
+    def set_command(self, value: str):
+        self.command_var.set(value)
+    
     def set_username_change_cb(self, cb: Callable[[str], None]):
         self.username_change_cb = cb
         
@@ -150,20 +164,24 @@ class SSHFrame(tk.LabelFrame):
         self.ssh_enabled_change_cb = cb
     
     def on_ssh_enabled_change(self, *args):
-        value = self.ssh_enabled_var.get()
-        self.ssh_enabled_change_cb(value)
+        if self.ssh_enabled_change_cb is not None:
+            value = self.ssh_enabled_var.get()
+            self.ssh_enabled_change_cb(value)
         
     def on_username_change(self, *args):
-        value = self.username_var.get()
-        self.username_change_cb(value)
+        if self.username_change_cb is not None:
+            value = self.username_var.get()
+            self.username_change_cb(value)
         
     def on_password_change(self, *args):
-        value = self.password_var.get()
-        self.password_change_cb(value)
+        if self.password_change_cb is not None:
+            value = self.password_var.get()
+            self.password_change_cb(value)
         
     def on_command_change(self, *args):
-        value = self.command_var.get()
-        self.command_change_cb(value)
+        if self.command_change_cb is not None:
+            value = self.command_var.get()
+            self.command_change_cb(value)
     
 class TimingFrame(tk.LabelFrame):
     precheck_var: tk.DoubleVar
@@ -171,11 +189,11 @@ class TimingFrame(tk.LabelFrame):
     speg_var: tk.DoubleVar
     maxdelay_var: tk.DoubleVar
     cycle_start_var: tk.IntVar
-    precheck_change_cb: Callable[[float], None] | None
-    checkloop_change_cb: Callable[[float], None] | None
-    speg_change_cb: Callable[[float], None] | None
-    maxdelay_change_cb: Callable[[float], None] | None
-    cycle_start_change_cb: Callable[[int], None] | None
+    precheck_change_cb: Callable[[float], None] | None = None
+    checkloop_change_cb: Callable[[float], None] | None = None
+    speg_change_cb: Callable[[float], None] | None = None
+    maxdelay_change_cb: Callable[[float], None] | None = None
+    cycle_start_change_cb: Callable[[int], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Timing")
@@ -203,6 +221,21 @@ class TimingFrame(tk.LabelFrame):
             entry.grid(row=idx, column=1, sticky="w", padx=0, pady=0)
             setattr(self, entry_name, entry)
     
+    def set_precheck(self, value: float):
+        self.precheck_var.set(value)
+    
+    def set_checkloop(self, value: float):
+        self.checkloop_var.set(value)
+    
+    def set_speg(self, value: float):
+        self.speg_var.set(value)
+    
+    def set_maxdelay(self, value: float):
+        self.maxdelay_var.set(value)
+    
+    def set_cycle_start(self, value: int):
+        self.cycle_start_var.set(value)
+    
     def set_precheck_cb(self, cb: Callable[[float], None]):
         self.precheck_change_cb = cb
 
@@ -219,30 +252,35 @@ class TimingFrame(tk.LabelFrame):
         self.cycle_start_change_cb = cb
 
     def on_precheck_change(self, *args):
-        value = self.precheck_var.get()
-        self.precheck_change_cb(value)
+        if self.precheck_change_cb is not None:
+            value = self.precheck_var.get()
+            self.precheck_change_cb(value)
         
     def on_checkloop_change(self, *args):
-        value = self.checkloop_var.get()
-        self.checkloop_change_cb(value)
+        if self.checkloop_change_cb is not None:
+            value = self.checkloop_var.get()
+            self.checkloop_change_cb(value)
     
     def on_speg_change(self, *args):
-        value = self.speg_var.get()
-        self.speg_change_cb(value)
+        if self.speg_change_cb is not None:
+            value = self.speg_var.get()
+            self.speg_change_cb(value)
     
     def on_cycle_start_change(self, *args):
-        value = self.cycle_start_var.get()
-        self.cycle_start_change_cb(value)
+        if self.cycle_start_change_cb is not None:
+            value = self.cycle_start_var.get()
+            self.cycle_start_change_cb(value)
         
     def on_maxdelay_change(self, *args):
-        value = self.maxdelay_var.get()
-        self.maxdelay_change_cb(value)
+        if self.maxdelay_change_cb is not None:
+            value = self.maxdelay_var.get()
+            self.maxdelay_change_cb(value)
 
 class PsuFrame(tk.LabelFrame):
     psu_ip_var: tk.StringVar
     psu_enabled_var: tk.IntVar
-    psu_ip_change_cb: Callable[[str], None] | None
-    psu_enabled_change_cb: Callable[[bool], None] | None
+    psu_ip_change_cb: Callable[[str], None] | None = None
+    psu_enabled_change_cb: Callable[[bool], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="PSU")
@@ -250,8 +288,8 @@ class PsuFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         # Riga 1: use remote PSU
-        self.psu_enabled = tk.IntVar(self)
-        psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled, command=self.on_psu_enable_change)
+        self.psu_enabled_var = tk.IntVar(self)
+        psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled_var, command=self.on_psu_enable_change)
         psu_enabled_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
         
         # Riga 0: IP Alimentatore, IP Start e IP End
@@ -263,6 +301,12 @@ class PsuFrame(tk.LabelFrame):
         self.psu_ip = tk.Entry(self, width=15, textvariable=self.psu_ip_var)
         self.psu_ip.grid(row=1, column=1, padx=0)
     
+    def set_psu_ip(self, value: str):
+        self.psu_ip_var.set(value)
+    
+    def set_psu_enabled(self, value: bool):
+        self.psu_enabled_var.set(value)
+    
     def set_psu_ip_change_cb(self, cb: Callable[[str], None]):
         self.psu_ip_change_cb = cb
     
@@ -270,21 +314,23 @@ class PsuFrame(tk.LabelFrame):
         self.psu_enabled_change_cb = cb
     
     def on_psu_ip_change(self, *args):
-        value = self.psu_ip_var.get()
-        self.psu_ip_change_cb(value)
+        if self.psu_ip_change_cb is not None:
+            value = self.psu_ip_var.get()
+            self.psu_ip_change_cb(value)
 
     def on_psu_enable_change(self, *args):
-        value = self.psu_enabled_var.get()
-        self.psu_enabled_change_cb(value)
+        if self.psu_enabled_change_cb is not None:
+            value = self.psu_enabled_var.get()
+            self.psu_enabled_change_cb(value)
 
 class ManualControlsFrame(tk.LabelFrame):
     pause_button: tk.Button
     pause_status_label: tk.Label
-    start_button_press_cb: Callable[[], None] | None
-    stop_button_press_cb: Callable[[], None] | None
-    pause_button_press_cb: Callable[[], None] | None
-    force_on_button_press_cb: Callable[[], None] | None
-    force_off_button_press_cb: Callable[[], None] | None
+    start_button_press_cb: Callable[[], None] | None = None
+    stop_button_press_cb: Callable[[], None] | None = None
+    pause_button_press_cb: Callable[[], None] | None = None
+    force_on_button_press_cb: Callable[[], None] | None = None
+    force_off_button_press_cb: Callable[[], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Controlli Manuali")
@@ -330,19 +376,24 @@ class ManualControlsFrame(tk.LabelFrame):
         self.force_off_button_press_cb = cb
     
     def on_start_button_press(self):
-        self.start_button_press_cb()
+        if self.start_button_press_cb is not None:
+            self.start_button_press_cb()
     
     def on_stop_button_press(self):
-        self.stop_button_press_cb()
+        if self.stop_button_press_cb is not None:
+            self.stop_button_press_cb()
     
     def on_pause_button_press(self):
-        self.pause_button_press_cb()
+        if self.pause_button_press_cb is not None:
+            self.pause_button_press_cb()
     
     def on_force_poweron_button_press(self):
-        self.force_on_button_press_cb()
+        if self.force_on_button_press_cb is not None:
+            self.force_on_button_press_cb()
     
     def on_force_poweronff_button_press(self):
-        self.force_off_button_press_cb()
+        if self.force_off_button_press_cb is not None:
+            self.force_off_button_press_cb()
 
 class InfoFrame(tk.LabelFrame):
     elapsed_time_label: tk.Label
@@ -416,7 +467,7 @@ class IpTableFrame(tk.LabelFrame):
 
 class FileFrame(tk.LabelFrame):
     file: scrolledtext.ScrolledText
-    apply_button_press_cb: Callable[[], None] | None
+    apply_button_press_cb: Callable[[], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="File")
@@ -433,7 +484,8 @@ class FileFrame(tk.LabelFrame):
         self.apply_button_press_cb = cb
     
     def on_apply_button_press(self):
-        self.apply_button_press_cb()
+        if self.apply_button_press_cb is not None:
+            self.apply_button_press_cb()
     
     def load_text(self, content: str):
         self.file.insert('1.0', content)

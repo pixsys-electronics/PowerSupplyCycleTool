@@ -228,10 +228,18 @@ class RigolTestApp(tk.Tk):
         top_left_frame.grid(row=0, column=0, sticky="nw")
 
         self.psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nw")
+        self.psu_frame.set_psu_enabled(self.config.connection.psu_enabled)
+        self.psu_frame.set_psu_ip(self.config.connection.psu_address)
         self.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
         self.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
         
         self.timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nw")
+        self.timing_frame.set_precheck(self.config.timing.pre_check_delay)
+        self.timing_frame.set_checkloop(self.config.timing.loop_check_period)
+        self.timing_frame.set_maxdelay(self.config.timing.max_startup_delay)
+        self.timing_frame.set_speg(self.config.timing.poweroff_delay)
+        self.timing_frame.set_cycle_start(self.config.timing.cycle_start)
+        
         self.timing_frame.set_precheck_cb(self.on_timing_precheck_change)
         self.timing_frame.set_maxdelay_cb(self.on_timing_maxdelay_change)
         self.timing_frame.set_speg_cb(self.on_timing_speg_change)
@@ -239,6 +247,11 @@ class RigolTestApp(tk.Tk):
         self.timing_frame.set_cycle_start_cb(self.on_timing_cycle_start_change)
         
         self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nw")
+        self.ssh_frame.set_ssh_enabled(self.config.ssh.enabled)
+        self.ssh_frame.set_username(self.config.ssh.username)
+        self.ssh_frame.set_password(self.config.ssh.password)
+        self.ssh_frame.set_command(self.config.ssh.command)
+        
         self.ssh_frame.set_ssh_enabled_change_cb(self.on_ssh_enabled_change)
         self.ssh_frame.set_username_change_cb(self.on_ssh_username_change)
         self.ssh_frame.set_password_change_cb(self.on_ssh_password_change)
