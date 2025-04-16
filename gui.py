@@ -115,3 +115,51 @@ class SSHFrame(tk.LabelFrame):
     
     def on_command_change(self, *args):
         pass
+
+class TimingFrame(tk.LabelFrame):
+    entry_precheck_var: tk.DoubleVar
+    entry_checkloop_var: tk.DoubleVar
+    entry_spegn_var: tk.DoubleVar
+    entry_maxdelay_var: tk.DoubleVar
+    entry_cycle_start_var: tk.IntVar
+    
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="Timing")
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+
+        labels_entries = [
+            ("Attesa prima di controllare IP (Pre-check):", "entry_precheck"),
+            ("Intervallo tra controlli IP:", "entry_checkloop"),
+            ("Durata spegnimento:", "entry_speg"),
+            ("Massimo ritardo avvio dispositivi:", "entry_maxdelay"),
+            ("Conteggio di partenza:", "entry_cycle_start")
+        ]
+
+        for idx, (label_text, entry_name) in enumerate(labels_entries):
+            label = tk.Label(self, text=label_text)
+            label.grid(row=idx, column=0, sticky="w", padx=0, pady=0)
+            
+            entry_var = tk.IntVar()
+            callback_name = f"on_{entry_name}_change"
+            callback = getattr(self, callback_name)
+            entry_var.trace_add("write", callback)
+
+            setattr(self, f"{entry_name}_var", entry_var)
+            entry = tk.Entry(self, width=6, textvariable=entry_var)
+            entry.grid(row=idx, column=1, sticky="w", padx=0, pady=0)
+            setattr(self, entry_name, entry)
+    
+    def on_entry_precheck_change(self, *args):
+        pass
+        
+    def on_entry_checkloop_change(self, *args):
+        pass        
+    
+    def on_entry_speg_change(self, *args):
+        pass    
+    
+    def on_entry_cycle_start_change(self, *args):
+        pass    
+        
+    def on_entry_maxdelay_change(self, *args):
+        pass    
