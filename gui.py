@@ -192,7 +192,7 @@ class TimingFrame(tk.LabelFrame):
     checkloop_var: tk.DoubleVar
     speg_var: tk.DoubleVar
     maxdelay_var: tk.DoubleVar
-    cycle_start_var: tk.IntVar
+    cycle_start_var: tk.DoubleVar
     precheck_change_cb: Callable[[float], None] | None = None
     checkloop_change_cb: Callable[[float], None] | None = None
     speg_change_cb: Callable[[float], None] | None = None
@@ -215,7 +215,7 @@ class TimingFrame(tk.LabelFrame):
             label = tk.Label(self, text=label_text)
             label.grid(row=idx, column=0, sticky="w", padx=0, pady=0)
             
-            entry_var = tk.IntVar(self)
+            entry_var = tk.DoubleVar(self)
             callback_name = f"on_{entry_name}_change"
             callback = getattr(self, callback_name)
             entry_var.trace_add("write", callback)
