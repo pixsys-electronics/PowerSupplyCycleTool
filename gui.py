@@ -139,7 +139,7 @@ class TimingFrame(tk.LabelFrame):
             label = tk.Label(self, text=label_text)
             label.grid(row=idx, column=0, sticky="w", padx=0, pady=0)
             
-            entry_var = tk.IntVar()
+            entry_var = tk.IntVar(self)
             callback_name = f"on_{entry_name}_change"
             callback = getattr(self, callback_name)
             entry_var.trace_add("write", callback)
@@ -163,3 +163,31 @@ class TimingFrame(tk.LabelFrame):
         
     def on_entry_maxdelay_change(self, *args):
         pass    
+
+class PsuFrame(tk.LabelFrame):
+    psu_ip_var: tk.StringVar
+    
+    def __init__(self, parent, row, col, padx, pady, sticky):
+        super().__init__(parent, text="PSU")
+        # Frame 1: IP Alimentatore, Range IP e URL di verifica
+        self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+
+        # Riga 0: IP Alimentatore, IP Start e IP End
+        psu_ip_label = tk.Label(self, text="IP Alimentatore:")
+        psu_ip_label.grid(row=0, column=0, padx=0, pady=0)
+        
+        self.psu_ip_var = tk.StringVar(self)
+        self.psu_ip_var.trace_add("write", self.on_psu_ip_change)
+        self.psu_ip = tk.Entry(self, width=15, textvariable=self.psu_ip_var)
+        self.psu_ip.grid(row=0, column=1, padx=0)
+        
+        # Riga 1: use remote PSU
+        self.psu_enabled = tk.IntVar(self)
+        psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled, command=self.on_psu_enable_change)
+        psu_enabled_checkbutton.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+    
+    def on_psu_ip_change(self, *args):
+        pass
+
+    def on_psu_enable_change(self, *args):
+        pass
