@@ -150,6 +150,15 @@ class RigolTestApp(tk.Tk):
     window_title = "Rigol Test GUI"
     window_w = 1280
     window_h = 800
+    psu_frame: PsuFrame
+    timing_frame: TimingFrame
+    ssh_frame: SSHFrame
+    modbus_frame: ModbusFrame
+    file_frame: FileFrame
+    manual_controls_frame: ManualControlsFrame
+    info_frame: InfoFrame
+    ip_frame: IpTableFrame
+    log_frame: LogFrame
 
     def __init__(self, version):
         super().__init__()
@@ -219,8 +228,21 @@ class RigolTestApp(tk.Tk):
         top_left_frame.grid(row=0, column=0, sticky="nw")
 
         self.psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nw")
+        self.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
+        self.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
+        
         self.timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nw")
+        self.timing_frame.set_precheck_cb(self.on_timing_precheck_change)
+        self.timing_frame.set_maxdelay_cb(self.on_timing_maxdelay_change)
+        self.timing_frame.set_speg_cb(self.on_timing_speg_change)
+        self.timing_frame.set_checkloop_cb(self.on_timing_checkloop_change)
+        self.timing_frame.set_cycle_start_cb(self.on_timing_cycle_start_change)
+        
         self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nw")
+        self.ssh_frame.set_ssh_enabled_change_cb(self.on_ssh_enabled_change)
+        self.ssh_frame.set_username_change_cb(self.on_ssh_username_change)
+        self.ssh_frame.set_password_change_cb(self.on_ssh_password_change)
+        self.ssh_frame.set_command_change_cb(self.on_ssh_command_change)
         
         self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nw")
         self.modbus_frame.set_modbus_enable(True)
@@ -230,6 +252,10 @@ class RigolTestApp(tk.Tk):
         top_right_frame.grid(row=0, column=1, sticky="ne")
         
         self.file_frame = FileFrame(top_right_frame, 0, 0, 5, 5, "ne")
+        url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
+        with open(url_list_path) as f: content = f.read()
+        self.file_frame.load_text(content)
+        self.file_frame.set_apply_button_press_cb(self.on_file_apply_press)
         
         # BOTTOM FRAME
         bottom_frame = tk.Frame(self)
@@ -243,6 +269,12 @@ class RigolTestApp(tk.Tk):
         bottom_left_frame.grid(row=0, column=0, sticky="nw")
 
         self.manual_controls_frame = ManualControlsFrame(bottom_left_frame, 0, 0, 5, 5, "nw")
+        self.manual_controls_frame.set_start_button_press_cb(self.on_commands_start_test)
+        self.manual_controls_frame.set_stop_button_press_cb(self.on_commands_stop_test)
+        self.manual_controls_frame.set_pause_button_press_cb(self.on_commands_toggle_pause)
+        self.manual_controls_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
+        self.manual_controls_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
+        
         self.info_frame = InfoFrame(bottom_left_frame, 1, 0, 5, 5, "nw")
         self.ip_frame = IpTableFrame(bottom_left_frame, 2, 0, 5, 5, "nw")
         
@@ -252,192 +284,122 @@ class RigolTestApp(tk.Tk):
         
         self.log_frame = LogFrame(bottom_right_frame, 0, 0, 5, 5, "nw")
     
-    def init_url_file_frame(self, parent, row, col):
-        self.url_file_frame = ttk.Frame(parent)
-        self.url_file_frame.grid(row=row, column=col, padx=5, pady=5)
+    def on_ssh_enabled_change(self, value: bool):
+        self.config.ssh.enabled = value
+        self.save_config()
+    
+    def on_ssh_username_change(self, value: str):
+        self.config.ssh.username = value
+        self.save_config()
+    
+    def on_ssh_password_change(self, value: str):
+        self.config.ssh.password = value
+        self.save_config()
+    
+    def on_ssh_command_change(self, value: str):
+        self.config.ssh.command = value
+        self.save_config()
+    
+    def on_psu_enable_change(self, value: bool):
+        self.config.connection.psu_enabled = value
+        self.save_config()
+    
+    def on_psu_ip_change(self, value: str):
+        self.config.connection.psu_address = value
+        self.save_config()
+    
+    def on_timing_precheck_change(self, value: float):
+        self.config.timing.pre_check_delay = value
+        self.save_config()
+    
+    def on_timing_checkloop_change(self, value: float):
+        self.config.timing.loop_check_period = value
+        self.save_config()
 
-        self.url_file = scrolledtext.ScrolledText(self.url_file_frame)
-        self.url_file.grid(row=0, column=0)
-        self.url_file.config(height=15)
+    def on_timing_speg_change(self, value: float):
+        self.config.timing.poweroff_delay = value
+        self.save_config()
+    
+    def on_timing_cycle_start_change(self, value: int):
+        self.config.timing.cycle_start = value
+        self.save_config()
+    
+    def on_timing_maxdelay_change(self, value: float):
+        self.config.timing.max_startup_delay = value
+        self.save_config()
+    
+    def on_commands_start_test(self):
+        """Avvia il test in un thread separato, reimpostando contatori e flag."""
+        if not self.run_test:
+            self.run_test = True
+            self.is_paused = False
+            self.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
+            self.manual_controls_frame.set_pause_button_text("Pausa")
+            self.log("[INFO] Test avviato.")
+            self.test_start_time = time.time()
+            self.update_elapsed_time()
+            self.test_stopped_intentionally = False
+            self.cycle_count = self.config.timing.cycle_start
+            self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
+            self.anomaly_count = 0
+            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+            self.report_filename = self.make_report_filename()
+            report_folderpath = os.path.join(os.getcwd(), self.report_folder)
+            os.makedirs(report_folderpath, exist_ok=True)
+            self.report_filepath = os.path.join(report_folderpath, self.report_filename)
+            if self.report_filepath:
+                self.write_test_start_line()
+            else:
+                self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
+            self.test_thread = threading.Thread(target=self.test_loop, daemon=True)
+            self.test_thread.start()
+    
+    def on_commands_stop_test(self):
+        """Ferma il test in modo pulito."""
+        self.run_test = False
+        self.test_stopped_intentionally = True
+        self.log("[INFO] Richiesto stop del test.")
+    
+    def on_commands_toggle_pause(self):
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            self.manual_controls_frame.set_pause_status_label("Stato: In Pausa")
+            self.manual_controls_frame.set_pause_button_text("Riprendi")
+            self.log("[INFO] Test in pausa.")
+        else:
+            self.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
+            self.manual_controls_frame.set_pause_button_text("Pausa")
+            self.log("[INFO] Test ripreso.")
 
+    def on_commands_force_power_on(self):
+        """Forza manualmente l'accensione dell'alimentatore."""
+        try:
+            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            self.psu_connect()
+            self.psu_init()
+            self.psu_poweron()
+            self.log("[INFO] Alimentatore forzato su ON.")
+        except Exception as e:
+            self.log(f"[ERRORE] Errore durante l'accensione forzata: {str(e)}")
+
+    def on_commands_force_power_off(self):
+        """Forza manualmente lo spegnimento dell'alimentatore."""
+        try:
+            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            self.psu_connect()
+            self.psu_poweroff()
+            self.log("[INFO] Alimentatore forzato su OFF.")
+        except Exception as e:
+            self.log(f"[ERRORE] Errore durante lo spegnimento forzato: {str(e)}")
+    
+    def on_file_apply_press(self):
+        content = self.file_frame.get_text()
+        self.urls = url_list_from_csv(content)
+        self.refresh_address_table()
+        
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
-        with open(url_list_path) as f: content = f.read()
-        self.url_file.insert('1.0', content)
-
-        self.apply_button = ttk.Button(self.url_file_frame, text="Apply", command=self.apply_url_file)
-        self.apply_button.grid(row=1, column=0, padx=5, pady=5)
-    
-    def init_info_frame(self, parent, row, col):
-        # Frame 3: Info frame (timer, contatori)
-        info_frame = ttk.Frame(parent)
-        info_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
-
-        self.elapsed_time_label = ttk.Label(info_frame, text="Test non ancora partito.")
-        self.elapsed_time_label.pack(side="left", padx=5)
-
-        self.cycle_count_label = ttk.Label(info_frame, text="Accensioni eseguite: 0")
-        self.cycle_count_label.pack(side="left", padx=5)
-
-        self.anomaly_count_label = ttk.Label(info_frame, text="Accensioni con anomalia: 0")
-        self.anomaly_count_label.pack(side="left", padx=5)
-    
-    def init_command_frame(self, parent, row, col):
-        # Frame 4: Controlli manuali
-        self.manual_frame = ttk.LabelFrame(parent, text="Controlli Manuali")
-        self.manual_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nw")
-
-        # self.manual_frame.grid_columnconfigure(3, weight=1)
-
-        self.start_button = ttk.Button(self.manual_frame, text="Start", command=self.start_test)
-        self.start_button.pack(side="left", padx=5, pady=5)
-
-        self.stop_button = ttk.Button(self.manual_frame, text="Stop", command=self.stop_test)
-        self.stop_button.pack(side="left", padx=5, pady=5)
-
-        self.pause_button = ttk.Button(self.manual_frame, text="Pausa", command=self.toggle_pause)
-        self.pause_button.pack(side="left", padx=5, pady=5)
-
-        self.force_on_button = ttk.Button(self.manual_frame, text="Forza ON", command=self.force_power_on)
-        self.force_on_button.pack(side="left", padx=5, pady=5)
-
-        self.force_off_button = ttk.Button(self.manual_frame, text="Forza OFF", command=self.force_power_off)
-        self.force_off_button.pack(side="left", padx=5, pady=5)
-
-        self.pause_status_label = ttk.Label(self.manual_frame, text="Stato: In esecuzione")
-        self.pause_status_label.pack(side="left", padx=5, pady=5)
-    
-    def init_params_frame(self, parent, row, col):
-        # Frame 2: Configurazione Tempi
-        self.times_frame = ttk.LabelFrame(parent, text="Configurazione Tempi (in secondi)")
-        self.times_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
-
-        labels_entries = [
-            ("Attesa prima di controllare IP (Pre-check):", "entry_precheck", self.config.timing.pre_check_delay),
-            ("Intervallo tra controlli IP:", "entry_checkloop", self.config.timing.loop_check_period),
-            ("Durata spegnimento:", "entry_speg", self.config.timing.poweroff_delay),
-            ("Massimo ritardo avvio dispositivi:", "entry_maxdelay", self.config.timing.max_startup_delay),
-            ("Conteggio di partenza:", "entry_cycle_start", self.config.timing.cycle_start)
-        ]
-
-        for idx, (label_text, entry_name, default_value) in enumerate(labels_entries):
-            ttk.Label(self.times_frame, text=label_text).grid(row=idx, column=0, sticky="w", padx=5, pady=2)
-            entry_var = tk.StringVar()
-            entry_var.set(default_value)
-            callback_name = f"on_{entry_name}_change"
-            callback = getattr(self, callback_name)
-            entry_var.trace_add("write", callback)
-
-            setattr(self, f"{entry_name}_var", entry_var)
-            entry = ttk.Entry(self.times_frame, width=6, textvariable=entry_var)
-            entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
-            setattr(self, entry_name, entry)
-    
-    def init_modbus_frame(self, parent, row, col):
-        self.modbus_frame = ttk.LabelFrame(parent, text="MODBUS")
-        self.modbus_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
-        
-        # ROW0
-        self.modbus_enable = IntVar(master = self.modbus_frame, value=self.config.ssh.enabled)
-        c1 = tk.Checkbutton(self.modbus_frame, text='Enable automatic cycle count check',variable=self.modbus_enable, command=self.on_checkbutton_toggle)
-        c1.grid(row=0, column=col, padx=10, pady=5, sticky="nw")
-        
-        # ROW1 - register frame
-        register_frame = ttk.Frame(self.modbus_frame)
-        register_frame.grid(row=1, column=col, padx=10, pady=5, sticky="nw")
-        
-        register_address_label = ttk.Label(register_frame, text="Register address")
-        register_address_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
-        self.modbus_register_address_var = tk.StringVar()
-        modbus_register_address_entry = ttk.Entry(register_frame, width=20, textvariable=self.modbus_register_address_var)
-        modbus_register_address_entry.grid(row=0, column=1, padx=0, pady=0, sticky="nw")
-        
-        register_value_label = ttk.Label(register_frame, text="Register value")
-        register_value_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
-        self.modbus_register_value_var = tk.StringVar()
-        modbus_register_value_entry = ttk.Entry(register_frame, width=20, textvariable=self.modbus_register_value_var)
-        modbus_register_value_entry.grid(row=1, column=1, padx=0, pady=0, sticky="nw")
-
-        # ROW2 - buttons frame
-        buttons_frame = ttk.Frame(self.modbus_frame)
-        buttons_frame.grid(row=2, column=col, padx=10, pady=5, sticky="nw")
-        
-        self.modbus_read_register_button = ttk.Button(buttons_frame, text="Read", command=self.force_power_on)
-        self.modbus_read_register_button.pack(side="left", padx=5, pady=0)
-
-        self.force_write_button = ttk.Button(buttons_frame, text="Write", command=self.force_power_off)
-        self.force_write_button.pack(side="left", padx=5, pady=0)
-        
-        self.reset_cycle_count_button = ttk.Button(buttons_frame, text="Reset cycle count", command=self.reset_cycle_count)
-        self.reset_cycle_count_button.pack(side="left", padx=5, pady=0)
-        
-        self.reset_time_count_button = ttk.Button(buttons_frame, text="Reset time count", command=self.reset_cycle_count)
-        self.reset_time_count_button.pack(side="left", padx=5, pady=0)
-    
-    def on_checkbutton_toggle(self, *args):
-        self.config.ssh.enabled = not self.config.ssh.enabled
-        self.save_config()
-    
-    def on_username_change(self, *args):
-        self.config.ssh.username = self.username_var.get()
-        self.save_config()
-    
-    def on_password_change(self, *args):
-        self.config.ssh.password = self.password_var.get()
-        self.save_config()
-    
-    def on_command_change(self, *args):
-        self.config.ssh.command = self.command_var.get()
-        self.save_config()
-    
-    def on_psu_enable_change(self, *args):
-        self.config.connection.psu_enabled = not self.config.connection.psu_enabled
-        self.save_config()
-    
-    # TODO each _var is created inside the loop right above here. Please declare them as class properties
-    def on_entry_precheck_change(self, *args):
-        if hasattr(self, "entry_precheck_var"):
-            try:
-                value = float(self.entry_precheck_var.get())
-                self.config.timing.pre_check_delay = value
-                self.save_config()
-            except:
-                pass
-    
-    def on_entry_checkloop_change(self, *args):
-        if hasattr(self, "entry_checkloop_var"):
-            try:
-                value = float(self.entry_checkloop_var.get())
-                self.config.timing.loop_check_period = value
-                self.save_config()
-            except:
-                pass
-
-    def on_entry_speg_change(self, *args):
-        if hasattr(self, "entry_speg_var"):
-            try:
-                value = float(self.entry_speg_var.get())
-                self.config.timing.poweroff_delay = value
-                self.save_config()
-            except:
-                pass
-    
-    def on_entry_cycle_start_change(self, *args):
-        if hasattr(self, "entry_cycle_start_var"):
-            try:
-                value = int(self.entry_cycle_start_var.get())
-                self.config.timing.cycle_start = value
-                self.save_config()
-            except:
-                pass
-    
-    def on_entry_maxdelay_change(self, *args):
-        if hasattr(self, "entry_maxdelay_var"):
-            try:
-                value = float(self.entry_maxdelay_var.get())
-                self.config.timing.max_startup_delay = value
-                self.save_config()
-            except:
-                pass
+        with open(url_list_path, mode="w", encoding="utf-8") as file:
+            file.write(content)
     
     def save_config(self):
         config_path = os.path.join(os.getcwd(), self.config_filename)
@@ -446,89 +408,19 @@ class RigolTestApp(tk.Tk):
         with open(config_path, mode="w", encoding="utf-8") as file:
             file.write(data_json)
     
-    def init_psu_frame(self, parent, row, col):
-        # Frame 1: IP Alimentatore, Range IP e URL di verifica
-        self.range_frame = ttk.LabelFrame(parent, text="Alimentatore")
-        self.range_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
-
-        # self.range_frame.grid_columnconfigure(6, weight=1)
-
-        # Riga 0: IP Alimentatore, IP Start e IP End
-        ttk.Label(self.range_frame, text="IP Alimentatore:").grid(row=0, column=0, padx=5, pady=5)
-        self.dp832_entry = ttk.Entry(self.range_frame, width=15)
-        self.dp832_entry.insert(0, str(self.config.connection.psu_address))
-        self.dp832_entry.grid(row=0, column=1, padx=5)
-        
-        self.psu_enabled = IntVar(master = self.range_frame, value=self.config.connection.psu_enabled)
-        c1 = tk.Checkbutton(self.range_frame, text='Use remote PSU',variable=self.psu_enabled, command=self.on_psu_enable_change)
-        c1.grid(row=1, column=col, padx=10, pady=5, sticky="nw")
-        
-    
-    def init_ip_table(self, parent, row, col):
-        # Frame 5: Tabella IP
-        self.table_frame = ttk.Frame(parent)
-        self.table_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
-
-        ttk.Label(self.table_frame, text="Stato IP (Mostra orario di rilevamento):").pack(anchor="w")
-
-        columns = ("ip", "detected")
-        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
-        self.tree.heading("ip", text="Indirizzo IP")
-        self.tree.heading("detected", text="Rilevato alle (HH:MM:SS)")
-        self.tree.column("ip", width=200)
-        self.tree.column("detected", width=300)
-
-        # Definizione dei tag per la Treeview
-        self.tree.tag_configure('error', foreground='red')
-        self.tree.tag_configure('normal', foreground='black')
-
-        # Set fixed height (for example, 10 rows max visible)
-        self.tree.config(height=10)
-
-        # Pack Treeview with fill='y' so it adjusts to the height
-        self.tree.pack(side='left', fill='both', expand=True)
-
-        # Scrollbar
-        vsb = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.tree.yview)
-        vsb.pack(side='right', fill='y')
-
-        self.tree.configure(yscrollcommand=vsb.set)
-    
-    def init_log_frame(self, parent, row, col):
-        # Frame 6: Controlli e Log
-        self.controls_frame = ttk.LabelFrame(parent, text="Log")
-        self.controls_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nsew")
-
-        # Area Log
-        # ttk.LabelFrame(self.controls_frame, text="Log").grid(row=1, column=0, sticky="w")
-        self.log_text = scrolledtext.ScrolledText(self.controls_frame, wrap=tk.WORD)
-        self.log_text.grid(row=2, column=0, sticky="nsew")
-        self.log_text.config(height=17)
-
-    
-    def apply_url_file(self):
-        content = self.url_file.get("1.0", "end-1c")
-        self.urls = url_list_from_csv(content)
-        self.refresh_address_table()
-        
-        url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
-        with open(url_list_path, mode="w", encoding="utf-8") as file:
-            file.write(content)
-            
     def clear_address_table(self):
         self.urls.clear()
         self.refresh_address_table()
     
     def refresh_address_table(self):
         # Pulisce la Treeview
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self.ip_frame.tree_clear()
         
         # Resetta i tempi di rilevamento
         self.detection_times.clear()
         for ip in self.urls:
             self.detection_times[ip] = None
-            self.tree.insert("", tk.END, iid=ip, values=(ip, ""), tags=('normal',))
+            self.ip_frame.tree_insert(ip, (ip, ""), ('normal',))
             self.log(f"[INFO] URL found: {ip}")
         
     def log(self, message):
@@ -543,8 +435,8 @@ class RigolTestApp(tk.Tk):
             except queue.Empty:
                 break
             else:
-                self.log_text.insert(tk.END, msg + "\n")
-                self.log_text.see(tk.END)
+                self.log_frame.add_log(msg)
+                self.log_frame.scroll_down()
         self.after(500, self.process_log_queue)
 
     def process_gui_queue(self):
@@ -557,13 +449,13 @@ class RigolTestApp(tk.Tk):
                     getattr(self, label_name).config(text=text)
                 elif gui_msg[0] == 'update_tree':
                     ip, detected_time = gui_msg[1], gui_msg[2]
-                    self.tree.set(ip, "detected", detected_time)
+                    self.ip_frame.tree_set(ip, "detected", detected_time)
                 elif gui_msg[0] == 'highlight_error':
                     ip = gui_msg[1]
-                    self.tree.item(ip, tags=('error',))
+                    self.ip_frame.tree_item(ip, ('error',))
                 elif gui_msg[0] == 'remove_tag':
                     ip = gui_msg[1]
-                    self.tree.item(ip, tags=('normal',))
+                    self.ip_frame.tree_item(ip, ('normal',))
             except queue.Empty:
                 break
             except Exception as e:
@@ -839,37 +731,6 @@ class RigolTestApp(tk.Tk):
         except Exception as e:
             self.log(f"[ERRORE] Errore durante la scrittura del ciclo nel report: {str(e)}")
 
-    def start_test(self):
-        """Avvia il test in un thread separato, reimpostando contatori e flag."""
-        if not self.run_test:
-            self.run_test = True
-            self.is_paused = False
-            self.pause_status_label.configure(text="Stato: In esecuzione")
-            self.pause_button.configure(text="Pausa")
-            self.log("[INFO] Test avviato.")
-            self.test_start_time = time.time()
-            self.update_elapsed_time()
-            self.test_stopped_intentionally = False
-            self.cycle_count = self.config.timing.cycle_start
-            self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-            self.anomaly_count = 0
-            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-            self.report_filename = self.make_report_filename()
-            report_folderpath = os.path.join(os.getcwd(), self.report_folder)
-            os.makedirs(report_folderpath, exist_ok=True)
-            self.report_filepath = os.path.join(report_folderpath, self.report_filename)
-            if self.report_filepath:
-                self.write_test_start_line()
-            else:
-                self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
-            self.test_thread = threading.Thread(target=self.test_loop, daemon=True)
-            self.test_thread.start()
-
-    def stop_test(self):
-        """Ferma il test in modo pulito."""
-        self.run_test = False
-        self.test_stopped_intentionally = True
-        self.log("[INFO] Richiesto stop del test.")
 
     def update_elapsed_time(self):
         """Aggiorna il timer dell'interfaccia."""
@@ -878,40 +739,8 @@ class RigolTestApp(tk.Tk):
             hours, remainder = divmod(int(elapsed), 3600)
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-            self.elapsed_time_label.config(text=f"Tempo dall'avvio: {elapsed_str}")
+            self.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
             self.after(1000, self.update_elapsed_time)
-
-    def toggle_pause(self):
-        self.is_paused = not self.is_paused
-        if self.is_paused:
-            self.pause_button.configure(text="Riprendi")
-            self.pause_status_label.configure(text="Stato: In Pausa")
-            self.log("[INFO] Test in pausa.")
-        else:
-            self.pause_button.configure(text="Pausa")
-            self.pause_status_label.configure(text="Stato: In esecuzione")
-            self.log("[INFO] Test ripreso.")
-
-    def force_power_on(self):
-        """Forza manualmente l'accensione dell'alimentatore."""
-        try:
-            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
-            self.psu_connect()
-            self.psu_init()
-            self.psu_poweron()
-            self.log("[INFO] Alimentatore forzato su ON.")
-        except Exception as e:
-            self.log(f"[ERRORE] Errore durante l'accensione forzata: {str(e)}")
-
-    def force_power_off(self):
-        """Forza manualmente lo spegnimento dell'alimentatore."""
-        try:
-            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
-            self.psu_connect()
-            self.psu_poweroff()
-            self.log("[INFO] Alimentatore forzato su OFF.")
-        except Exception as e:
-            self.log(f"[ERRORE] Errore durante lo spegnimento forzato: {str(e)}")
     
     def reset_cycle_count(self):
         self.cycle_count = 0

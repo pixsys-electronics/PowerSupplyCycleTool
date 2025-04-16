@@ -166,11 +166,11 @@ class SSHFrame(tk.LabelFrame):
         self.command_change_cb(value)
     
 class TimingFrame(tk.LabelFrame):
-    entry_precheck_var: tk.DoubleVar
-    entry_checkloop_var: tk.DoubleVar
-    entry_speg_var: tk.DoubleVar
-    entry_maxdelay_var: tk.DoubleVar
-    entry_cycle_start_var: tk.IntVar
+    precheck_var: tk.DoubleVar
+    checkloop_var: tk.DoubleVar
+    speg_var: tk.DoubleVar
+    maxdelay_var: tk.DoubleVar
+    cycle_start_var: tk.IntVar
     precheck_change_cb: Callable[[float], None] | None
     checkloop_change_cb: Callable[[float], None] | None
     speg_change_cb: Callable[[float], None] | None
@@ -182,11 +182,11 @@ class TimingFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         labels_entries = [
-            ("Attesa prima di controllare IP (Pre-check):", "entry_precheck"),
-            ("Intervallo tra controlli IP:", "entry_checkloop"),
-            ("Durata spegnimento:", "entry_speg"),
-            ("Massimo ritardo avvio dispositivi:", "entry_maxdelay"),
-            ("Conteggio di partenza:", "entry_cycle_start")
+            ("Attesa prima di controllare IP (Pre-check):", "precheck"),
+            ("Intervallo tra controlli IP:", "checkloop"),
+            ("Durata spegnimento:", "speg"),
+            ("Massimo ritardo avvio dispositivi:", "maxdelay"),
+            ("Conteggio di partenza:", "cycle_start")
         ]
 
         for idx, (label_text, entry_name) in enumerate(labels_entries):
@@ -203,40 +203,40 @@ class TimingFrame(tk.LabelFrame):
             entry.grid(row=idx, column=1, sticky="w", padx=0, pady=0)
             setattr(self, entry_name, entry)
     
-    def entry_precheck_cb(self, cb: Callable[[float], None]):
+    def set_precheck_cb(self, cb: Callable[[float], None]):
         self.precheck_change_cb = cb
 
-    def entry_checkloop_cb(self, cb: Callable[[float], None]):
+    def set_checkloop_cb(self, cb: Callable[[float], None]):
         self.checkloop_change_cb = cb
 
-    def entry_spegn_cb(self, cb: Callable[[float], None]):
+    def set_speg_cb(self, cb: Callable[[float], None]):
         self.speg_change_cb = cb
 
-    def entry_maxdelay_cb(self, cb: Callable[[float], None]):
+    def set_maxdelay_cb(self, cb: Callable[[float], None]):
         self.maxdelay_change_cb = cb
 
-    def entry_cycle_start_cb(self, cb: Callable[[int], None]):
+    def set_cycle_start_cb(self, cb: Callable[[int], None]):
         self.cycle_start_change_cb = cb
 
-    def on_entry_precheck_change(self, *args):
-        value = self.entry_precheck_var.get()
-        self.entry_precheck_cb(value)
+    def on_precheck_change(self, *args):
+        value = self.precheck_var.get()
+        self.precheck_change_cb(value)
         
-    def on_entry_checkloop_change(self, *args):
-        value = self.entry_checkloop_var.get()
-        self.entry_checkloop_cb(value)
+    def on_checkloop_change(self, *args):
+        value = self.checkloop_var.get()
+        self.checkloop_change_cb(value)
     
-    def on_entry_speg_change(self, *args):
-        value = self.entry_speg_var.get()
+    def on_speg_change(self, *args):
+        value = self.speg_var.get()
         self.speg_change_cb(value)
     
-    def on_entry_cycle_start_change(self, *args):
-        value = self.entry_cycle_start_var.get()
-        self.entry_cycle_start_cb(value)
+    def on_cycle_start_change(self, *args):
+        value = self.cycle_start_var.get()
+        self.cycle_start_change_cb(value)
         
-    def on_entry_maxdelay_change(self, *args):
-        value = self.entry_maxdelay_var.get()
-        self.entry_maxdelay_cb(value)
+    def on_maxdelay_change(self, *args):
+        value = self.maxdelay_var.get()
+        self.maxdelay_change_cb(value)
 
 class PsuFrame(tk.LabelFrame):
     psu_ip_var: tk.StringVar
@@ -278,6 +278,8 @@ class PsuFrame(tk.LabelFrame):
         self.psu_enabled_change_cb(value)
 
 class ManualControlsFrame(tk.LabelFrame):
+    pause_button: tk.Button
+    pause_status_label: tk.Label
     start_button_press_cb: Callable[[], None] | None
     stop_button_press_cb: Callable[[], None] | None
     pause_button_press_cb: Callable[[], None] | None
@@ -294,8 +296,8 @@ class ManualControlsFrame(tk.LabelFrame):
         stop_button = tk.Button(self, text="Stop", command=self.on_stop_button_press)
         stop_button.pack(side="left", padx=0, pady=0)
 
-        pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
-        pause_button.pack(side="left", padx=0, pady=0)
+        self.pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
+        self.pause_button.pack(side="left", padx=0, pady=0)
 
         force_on_button = tk.Button(self, text="Forza ON", command=self.on_force_poweron_button_press)
         force_on_button.pack(side="left", padx=0, pady=0)
@@ -303,8 +305,14 @@ class ManualControlsFrame(tk.LabelFrame):
         force_off_button = tk.Button(self, text="Forza OFF", command=self.on_force_poweronff_button_press)
         force_off_button.pack(side="left", padx=0, pady=0)
 
-        pause_status_label = tk.Label(self, text="Stato: In esecuzione")
-        pause_status_label.pack(side="left", padx=0, pady=0)
+        self.pause_status_label = tk.Label(self, text="Stato: In esecuzione")
+        self.pause_status_label.pack(side="left", padx=0, pady=0)
+    
+    def set_pause_button_text(self, content: str):
+        self.pause_button.configure(text=content)
+    
+    def set_pause_status_label(self, content: str):
+        self.pause_status_label.configure(text=content)
     
     def set_start_button_press_cb(self, cb: Callable[[], None]):
         self.start_button_press_cb = cb
