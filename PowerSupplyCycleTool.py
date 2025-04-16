@@ -114,7 +114,7 @@ def broadcast_ssh_command(ip_list: set[IPv4Address], username: str, password: st
     
     return future_results
 
-def broadcast_modbus_read_registers(ip_list: set[IPv4Address], reg_addr: int, reg_num: int) -> dict[IPv4Address, Future[list | None]]:
+def broadcast_modbus_read_register(ip_list: set[IPv4Address], reg_addr: int, reg_num: int) -> dict[IPv4Address, Future[list | None]]:
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_ip = {executor.submit(run_modbus_read_registers, ip, reg_addr, reg_num): ip for ip in ip_list}
@@ -139,7 +139,7 @@ def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, re
     return future_results
 
 def broadcast_modbus_read_poweron_counter(ip_list) -> dict[IPv4Address, Future[list | None]]:
-    return broadcast_modbus_read_registers(ip_list, 0, 1)
+    return broadcast_modbus_read_register(ip_list, 0, 1)
 
 def broadcast_modbus_write_poweron_counter(ip_list, reg_value: int) -> dict[IPv4Address, Future[bool]]:
     return broadcast_modbus_write_register(ip_list, 0, reg_value)
@@ -261,9 +261,14 @@ class RigolTestApp(tk.Tk):
         self.modbus_frame.set_modbus_enable(self.config.modbus.automatic_cycle_count_check_enabled)
         self.modbus_frame.set_register_address(self.config.modbus.register_address)
         self.modbus_frame.set_register_value(self.config.modbus.register_value)
+        
         self.modbus_frame.set_modbus_enable_change_cb(self.on_modbus_enable_change)
         self.modbus_frame.set_register_address_change_cb(self.on_modbus_register_address_change)
         self.modbus_frame.set_register_value_change_cb(self.on_modbus_register_value_change)
+        self.modbus_frame.set_read_register_press_cb(self.on_modbus_read_press)
+        self.modbus_frame.set_write_register_press_cb(self.on_modbus_write_press)
+        self.modbus_frame.set_reset_cycle_count_press_cb(self.on_modbus_reset_cycle_count_press)
+        self.modbus_frame.set_reset_time_count_press_cb(self.on_modbus_reset_time_count_press)
         
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
@@ -351,14 +356,59 @@ class RigolTestApp(tk.Tk):
         self.save_config()
     
     def on_modbus_register_address_change(self, value: int):
-        print(value)
         self.config.modbus.register_address = value
         self.save_config()
     
     def on_modbus_register_value_change(self, value: int):
         self.config.modbus.register_value = value
-        print(value)
         self.save_config()
+
+    def on_modbus_read_press(self):
+        ip_list = [ip_from_url(url) for url in self.urls]
+        futures_dict = broadcast_modbus_read_register(ip_list, self.config.modbus.register_address, 1)
+        for ip,future in futures_dict.items():
+                try:
+                    regs = future.result()
+                    if regs is None or len(regs) == 0:
+                        self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                        continue
+                    value = regs[0]
+                    self.log(f"[INFO] {str(ip)} address {self.config.modbus.register_address} value {value}")
+                    
+                except Exception as e:
+                    self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+
+    def on_modbus_write_press(self):
+        ip_list = [ip_from_url(url) for url in self.urls]
+        futures_dict = broadcast_modbus_write_register(ip_list, self.config.modbus.register_address, self.config.modbus.register_value)
+        for ip,future in futures_dict.items():
+            try:
+                ok = future.result()
+                if not ok:
+                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    continue
+                
+                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+            except Exception as e:
+                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+
+    def on_modbus_reset_cycle_count_press(self):
+        ip_list = [ip_from_url(url) for url in self.urls]
+        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
+        for ip,future in futures_dict.items():
+            try:
+                ok = future.result()
+                if not ok:
+                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    continue
+                
+                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+            except Exception as e:
+                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+
+    def on_modbus_reset_time_count_press(self):
+        pass
+
             
     def on_commands_start_test(self):
         """Avvia il test in un thread separato, reimpostando contatori e flag."""

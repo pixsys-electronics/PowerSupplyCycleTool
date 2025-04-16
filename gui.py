@@ -11,7 +11,7 @@ class ModbusFrame(tk.LabelFrame):
     modbus_register_value_change_cb: Callable[[int], None] | None = None
     
     reset_cycle_count_press_cb: Callable[[], None] | None = None
-    on_reset_time_count_press_cb: Callable[[], None] | None = None
+    reset_time_count_press_cb: Callable[[], None] | None = None
     read_register_press_cb: Callable[[], None] | None = None
     write_register_press_cb: Callable[[], None] | None = None
     
