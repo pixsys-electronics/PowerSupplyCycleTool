@@ -21,7 +21,7 @@ from paramiko import AuthenticationException, AutoAddPolicy, BadHostKeyException
 from concurrent.futures import Future, ThreadPoolExecutor
 import re
 from pyModbusTCP.client import ModbusClient
-from gui import ModbusFrame
+from gui import ModbusFrame, SSHFrame
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -329,7 +329,7 @@ class RigolTestApp(tk.Tk):
 
         self.init_psu_frame(top_left_frame, 0, 0)
         self.init_params_frame(top_left_frame, 1, 0)
-        self.init_ssh_frame(top_left_frame, 2, 0)
+        self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nw")
         self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nw")
         
         # TOP RIGHT FRAME
@@ -439,36 +439,6 @@ class RigolTestApp(tk.Tk):
             entry = ttk.Entry(self.times_frame, width=6, textvariable=entry_var)
             entry.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             setattr(self, entry_name, entry)
-    
-    def init_ssh_frame(self, parent, row, col):
-        self.ssh_frame = ttk.LabelFrame(parent, text="SSH")
-        self.ssh_frame.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
-        
-        self.chkValue = IntVar(master = self.ssh_frame, value=self.config.ssh.enabled)
-        
-        c1 = tk.Checkbutton(self.ssh_frame, text='Run SSH command on power-off',variable=self.chkValue, command=self.on_checkbutton_toggle)
-        c1.grid(row=row, column=col, padx=10, pady=5, sticky="nw")
-        
-        ttk.Label(self.ssh_frame, text="Username").grid(row=row+1, column=col, sticky="w", padx=5, pady=2)
-        self.username_var = tk.StringVar()
-        self.username_var.set(self.config.ssh.username)
-        self.username_var.trace_add("write", self.on_username_change)
-        username = ttk.Entry(self.ssh_frame, width=20, textvariable=self.username_var)
-        username.grid(row=row+1, column=col+1, padx=10, pady=5, sticky="nw")
-        
-        ttk.Label(self.ssh_frame, text="Password").grid(row=row+2, column=col, sticky="w", padx=5, pady=2)
-        self.password_var = tk.StringVar()
-        self.password_var.set(self.config.ssh.password)
-        self.password_var.trace_add("write", self.on_password_change)
-        password = ttk.Entry(self.ssh_frame, width=20, textvariable=self.password_var)
-        password.grid(row=row+2, column=col+1, padx=10, pady=5, sticky="nw")
-        
-        ttk.Label(self.ssh_frame, text="Command").grid(row=row+3, column=col, sticky="w", padx=5, pady=2)
-        self.command_var = tk.StringVar()
-        self.command_var.set(self.config.ssh.command)
-        command = ttk.Entry(self.ssh_frame, width=20, textvariable=self.command_var)
-        self.command_var.trace_add("write", self.on_command_change)
-        command.grid(row=row+3, column=col+1, padx=10, pady=5, sticky="nw")
     
     def init_modbus_frame(self, parent, row, col):
         self.modbus_frame = ttk.LabelFrame(parent, text="MODBUS")
