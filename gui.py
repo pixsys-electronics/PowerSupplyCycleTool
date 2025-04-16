@@ -506,9 +506,9 @@ class FileFrame(tk.LabelFrame):
         super().__init__(parent, text="File")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.file = scrolledtext.ScrolledText(self)
+        self.file = scrolledtext.ScrolledText(self, width=50)
         self.file.grid(row=0, column=0, sticky="nsew")
-        self.file.config(height=15)
+        self.file.config(height=17)
 
         apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
         apply_button.grid(row=1, column=0, padx=0, pady=0)
@@ -533,9 +533,9 @@ class LogFrame(tk.LabelFrame):
         super().__init__(parent, text="Log")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
+        self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=65)
         self.log_text.grid(row=0, column=0, sticky="nsew")
-        self.log_text.config(height=17)
+        self.log_text.config(height=23)
     
     def add_log(self, msg: str):
         self.log_text.insert(tk.END, msg + "\n")

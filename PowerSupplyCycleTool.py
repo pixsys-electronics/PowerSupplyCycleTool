@@ -162,7 +162,6 @@ class RigolTestApp(tk.Tk):
 
     def __init__(self, version):
         super().__init__()
-        self.geometry(f"{self.window_w}x{self.window_h}")
         self.title(f"{self.window_title} (commit {version})")
         
         config_path = os.path.join(os.getcwd(), self.config_filename)
@@ -219,9 +218,9 @@ class RigolTestApp(tk.Tk):
         # TOP FRAME
         top_frame = tk.Frame(self)
         top_frame.grid(row=0, column=0, sticky="nsew")
-        top_frame.grid_rowconfigure(0, weight=1)
-        top_frame.grid_columnconfigure(0, weight=1)
-        top_frame.grid_columnconfigure(1, weight=1)
+        # top_frame.grid_rowconfigure(0, weight=1)
+        # top_frame.grid_columnconfigure(0, weight=1)
+        # top_frame.grid_columnconfigure(1, weight=1)
 
         # TOP LEFT FRAME
         top_left_frame = tk.Frame(top_frame)
@@ -274,18 +273,14 @@ class RigolTestApp(tk.Tk):
         top_right_frame = tk.Frame(top_frame)
         top_right_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.file_frame = FileFrame(top_right_frame, 0, 0, 5, 5, "nsew")
-        url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
-        with open(url_list_path) as f: content = f.read()
-        self.file_frame.load_text(content)
-        self.file_frame.set_apply_button_press_cb(self.on_file_apply_press)
+        self.log_frame = LogFrame(top_right_frame, 0, 0, 5, 5, "nsew")
         
         # BOTTOM FRAME
         bottom_frame = tk.Frame(self)
         bottom_frame.grid(row=1, column=0, sticky="nsew")
-        bottom_frame.grid_rowconfigure(0, weight=1)
-        bottom_frame.grid_columnconfigure(0, weight=1)
-        bottom_frame.grid_columnconfigure(1, weight=1)
+        # bottom_frame.grid_rowconfigure(0, weight=1)
+        # bottom_frame.grid_columnconfigure(0, weight=1)
+        # bottom_frame.grid_columnconfigure(1, weight=1)
 
         # BOTTOM LEFT FRAME
         bottom_left_frame = tk.Frame(bottom_frame)
@@ -305,7 +300,14 @@ class RigolTestApp(tk.Tk):
         bottom_right_frame = tk.Frame(bottom_frame)
         bottom_right_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.log_frame = LogFrame(bottom_right_frame, 0, 0, 5, 5, "nsew")
+        self.file_frame = FileFrame(bottom_right_frame, 0, 0, 5, 5, "nsew")
+        url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
+        with open(url_list_path) as f: content = f.read()
+        self.file_frame.load_text(content)
+        self.file_frame.set_apply_button_press_cb(self.on_file_apply_press)
+        
+        self.update()
+        self.geometry("")
     
     def on_ssh_enabled_change(self, value: bool):
         self.config.ssh.enabled = value
