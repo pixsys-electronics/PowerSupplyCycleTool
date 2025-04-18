@@ -31,15 +31,15 @@ class ModbusFrame(tk.LabelFrame):
         modbus_register_address_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
         self.modbus_register_address_var = tk.IntVar()
         self.modbus_register_address_var.trace_add("write", self.on_register_address_change)
-        modbus_register_address_entry = tk.Entry(register_frame, width=20, textvariable=self.modbus_register_address_var)
-        modbus_register_address_entry.grid(row=0, column=1, padx=0, pady=0, sticky="nw")
+        modbus_register_address_entry = tk.Entry(register_frame, textvariable=self.modbus_register_address_var)
+        modbus_register_address_entry.grid(row=0, column=1, padx=0, pady=0, sticky="ne")
         
         register_value_label = tk.Label(register_frame, text="Register value")
         register_value_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
         self.modbus_register_value_var = tk.IntVar()
         self.modbus_register_value_var.trace_add("write", self.on_register_value_change)
-        modbus_register_value_entry = tk.Entry(register_frame, width=20, textvariable=self.modbus_register_value_var)
-        modbus_register_value_entry.grid(row=1, column=1, padx=0, pady=0, sticky="nw")
+        modbus_register_value_entry = tk.Entry(register_frame, textvariable=self.modbus_register_value_var)
+        modbus_register_value_entry.grid(row=1, column=1, padx=0, pady=0, sticky="new")
         
         # ROW2 - buttons frame
         buttons_frame = tk.Frame(self)
@@ -155,24 +155,24 @@ class SSHFrame(tk.LabelFrame):
         username_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
         self.username_var = tk.StringVar(credentials_frame)
         self.username_var.trace_add("write", self.on_username_change)
-        username = tk.Entry(credentials_frame, width=20, textvariable=self.username_var)
-        username.grid(row=0, column=1, padx=0, pady=0, sticky="nw")
+        username = tk.Entry(credentials_frame, width=40, textvariable=self.username_var)
+        username.grid(row=0, column=1, padx=0, pady=0, sticky="ne")
         
         # password
         password_label = tk.Label(credentials_frame, text="Password")
         password_label.grid(row=1, column=0, sticky="w", padx=0, pady=0)
         self.password_var = tk.StringVar(credentials_frame)
         self.password_var.trace_add("write", self.on_password_change)
-        password = tk.Entry(credentials_frame, width=20, textvariable=self.password_var)
-        password.grid(row=1, column=1, padx=0, pady=0, sticky="nw")
+        password = tk.Entry(credentials_frame, width=40, textvariable=self.password_var)
+        password.grid(row=1, column=1, padx=0, pady=0, sticky="ne")
         
         # command
         command_label = tk.Label(credentials_frame, text="Command")
         command_label.grid(row=2, column=0, sticky="w", padx=0, pady=0)
         self.command_var = tk.StringVar(credentials_frame)
         self.command_var.trace_add("write", self.on_command_change)
-        command = tk.Entry(credentials_frame, width=20, textvariable=self.command_var)
-        command.grid(row=2, column=1, padx=0, pady=0, sticky="nw")
+        command = tk.Entry(credentials_frame, width=40, textvariable=self.command_var)
+        command.grid(row=2, column=1, padx=0, pady=0, sticky="ne")
     
     def set_ssh_enabled(self, value: bool):
         value = int(value)
@@ -246,7 +246,7 @@ class TimingFrame(tk.LabelFrame):
 
         for idx, (label_text, entry_name, data_type) in enumerate(labels_entries):
             label = tk.Label(self, text=label_text)
-            label.grid(row=idx, column=0, sticky="w", padx=0, pady=0)
+            label.grid(row=idx, column=0, sticky="nw", padx=0, pady=0)
             
             entry_var = None
             match data_type:
@@ -265,8 +265,8 @@ class TimingFrame(tk.LabelFrame):
             entry_var.trace_add("write", callback)
 
             setattr(self, f"{entry_name}_var", entry_var)
-            entry = tk.Entry(self, width=6, textvariable=entry_var)
-            entry.grid(row=idx, column=1, sticky="w", padx=0, pady=0)
+            entry = tk.Entry(self, textvariable=entry_var)
+            entry.grid(row=idx, column=1, sticky="ne", padx=0, pady=0)
             setattr(self, entry_name, entry)
     
     def set_precheck(self, value: float):
@@ -355,12 +355,12 @@ class PsuFrame(tk.LabelFrame):
         
         # Riga 0: IP Alimentatore, IP Start e IP End
         psu_ip_label = tk.Label(self, text="IP Alimentatore:")
-        psu_ip_label.grid(row=1, column=0, padx=0, pady=0)
+        psu_ip_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
         
         self.psu_ip_var = tk.StringVar(self)
         self.psu_ip_var.trace_add("write", self.on_psu_ip_change)
-        self.psu_ip = tk.Entry(self, width=15, textvariable=self.psu_ip_var)
-        self.psu_ip.grid(row=1, column=1, padx=0)
+        self.psu_ip = tk.Entry(self, textvariable=self.psu_ip_var)
+        self.psu_ip.grid(row=1, column=1, sticky="ne")
     
     def set_psu_ip(self, value: str):
         self.psu_ip_var.set(value)
