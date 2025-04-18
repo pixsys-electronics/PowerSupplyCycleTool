@@ -704,7 +704,7 @@ class RigolTestApp(tk.Tk):
             self.cycle_count += 1
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
 
-            self.log(f"[INFO] Ciclo {self.cycle_count}")
+            self.log(f"[INFO] Cycle {self.cycle_count}")
             
             # if the remote PSU is enabled and SSH is disabled, switch on the PSU
             # if the remote PSU is enabled and SSH is enabled but it's the first cycle, switch on the PSU
@@ -713,9 +713,9 @@ class RigolTestApp(tk.Tk):
                 if not self.config.ssh.enabled or (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
                     try:
                         self.psu_poweron()
-                        self.log(f"[INFO] Alimentatore acceso")                    
+                        self.log(f"[INFO] PSU is ON")                    
                     except Exception as e:
-                        self.log(f"[ERRORE] Errore durante l'accensione: {str(e)}")
+                        self.log(f"[ERRORE] Error while trying to switch on the PSU: {str(e)}")
                         continue
                         
             # clear detection times and GUI
@@ -725,18 +725,26 @@ class RigolTestApp(tk.Tk):
                 self.gui_queue.put(('remove_tag', ip))
             
             # wait for precheck delay
-            self.log(f"[INFO] Attendo {self.config.timing.pre_check_delay} secondi prima del controllo degli IP.")
+            self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before starting the ping procedure")
             if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
+                self.log("[INFO] Test stopped, exiting test loop")
                 break
             
             # start the pinging loop
             # it exits if the ping is successfull (every URL has answered)
-            self.log(f"[INFO] Inizio controllo rapido degli IP ogni {self.config.timing.loop_check_period}s.")
+            self.log(f"[INFO] Ping procedure started")
             while self.wait_with_stop_check(self.config.timing.loop_check_period):
                 if self.is_paused:
+                    self.log("[INFO] Ping procedure paused")
                     continue
                 if self.ping():
                     break
+            
+            if not self.run_test:
+                self.log("[INFO] Ping procedure stopped, exiting test loop")
+                break
+                
+            self.log("[INFO] Ping procedure succesfully finished")
             
             # update the anomaly count using the size of the cycle_defectives set
             self.anomaly_count = self.anomaly_count + len(self.cycle_defectives)
@@ -747,6 +755,7 @@ class RigolTestApp(tk.Tk):
             
             # check if everyone has the same cycle count reading from registers using MODBUS protocol
             if self.config.modbus.automatic_cycle_count_check_enabled:
+                self.log(f"[INFO] MODBUS procedure started")
                 futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
                 cycle_count_failure = False
                 for ip,future in futures_dict.items():
@@ -770,14 +779,16 @@ class RigolTestApp(tk.Tk):
                 
                 # if something went wrong during the cycle count check, byee
                 if cycle_count_failure:
+                    self.log("[INFO] MODBUS procedure failed, exiting test loop")
                     break
-                
             
             if self.config.ssh.enabled:
                 ssh_failure = False
-                self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di lanciare il comando via SSH")
+                self.log("[INFO] Waiting 5 seconds before starting SSH procedure")
                 if not self.wait_with_stop_check(5):
+                    self.log("[INFO] SSH procedure stopped, exiting test loop")
                     break
+                self.log("[INFO] SSH procedure started")
                 ip_list = [ip_from_url(url) for url in self.urls]
                 ip_list = [ip for ip in ip_list if ip is not None]
                 futures_dict = broadcast_ssh_command(ip_list, self.config.ssh.username, self.config.ssh.password, self.config.ssh.command)
@@ -807,10 +818,15 @@ class RigolTestApp(tk.Tk):
                         break
                 
                 if ssh_failure:
+                    self.log("[INFO] SSH procedure failed, exiting test loop")
                     break
-
+                
+                self.log("[INFO] SSH procedure succesfully finished")
+                self.log(f"[INFO] Waiting {self.config.timing.poweroff_delay} before the next test iteration")
+                
                 if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
-                        break
+                    self.log(f"[INFO] Test stopped, exiting test loop")
+                    break
             
             else:
                 if self.config.connection.psu_enabled:
