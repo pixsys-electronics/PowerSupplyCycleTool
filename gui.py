@@ -225,7 +225,7 @@ class TimingFrame(tk.LabelFrame):
     checkloop_var: tk.DoubleVar
     speg_var: tk.DoubleVar
     maxdelay_var: tk.DoubleVar
-    cycle_start_var: tk.DoubleVar
+    cycle_start_var: tk.IntVar
     precheck_change_cb: Callable[[float], None] | None = None
     checkloop_change_cb: Callable[[float], None] | None = None
     speg_change_cb: Callable[[float], None] | None = None
@@ -237,18 +237,29 @@ class TimingFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         labels_entries = [
-            ("Attesa prima di controllare IP (Pre-check):", "precheck"),
-            ("Intervallo tra controlli IP:", "checkloop"),
-            ("Durata spegnimento:", "speg"),
-            ("Massimo ritardo avvio dispositivi:", "maxdelay"),
-            ("Conteggio di partenza:", "cycle_start")
+            ("Attesa prima di controllare IP (Pre-check):", "precheck", "float"),
+            ("Intervallo tra controlli IP:", "checkloop", "float"),
+            ("Durata spegnimento:", "speg", "float"),
+            ("Massimo ritardo avvio dispositivi:", "maxdelay", "float"),
+            ("Conteggio di partenza:", "cycle_start", "int")
         ]
 
-        for idx, (label_text, entry_name) in enumerate(labels_entries):
+        for idx, (label_text, entry_name, data_type) in enumerate(labels_entries):
             label = tk.Label(self, text=label_text)
             label.grid(row=idx, column=0, sticky="w", padx=0, pady=0)
             
-            entry_var = tk.DoubleVar(self)
+            entry_var = None
+            match data_type:
+                case "float":
+                    entry_var = tk.DoubleVar(self)
+                case "int":
+                    entry_var = tk.IntVar(self)
+                case _:
+                    pass
+            
+            if entry_var is None:
+                continue
+            
             callback_name = f"on_{entry_name}_change"
             callback = getattr(self, callback_name)
             entry_var.trace_add("write", callback)
