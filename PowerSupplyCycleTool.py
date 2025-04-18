@@ -67,7 +67,8 @@ def run_ssh_command(server: IPv4Address, username: str, password: str, command: 
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
     ssh.connect(str(server), username=username, password=password)
-    return ssh.exec_command(command)
+    _ = ssh.exec_command(command)
+    ssh.close()
 
 def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int):
     c = ModbusClient(host=str(host), auto_open=True, auto_close=True)
@@ -112,7 +113,7 @@ def broadcast_ping(url_list: set[str]) -> dict[str, Future[datetime.datetime | N
     return future_results
 
 # returns a dict where the key is the IP and the value is its completed future
-def broadcast_ssh_command(ip_list: set[IPv4Address], username: str, password: str, command: str) -> dict[IPv4Address, Future[tuple | None]]:
+def broadcast_ssh_command(ip_list: set[IPv4Address], username: str, password: str, command: str) -> dict[IPv4Address, Future[None]]:
     # spawn a bunch of workers to start the pinging process
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
@@ -794,7 +795,7 @@ class RigolTestApp(tk.Tk):
                 futures_dict = broadcast_ssh_command(ip_list, self.config.ssh.username, self.config.ssh.password, self.config.ssh.command)
                 for ip,future in futures_dict.items():
                     try:
-                        stdint, stdout, stderr = future.result()
+                        future.result()
                         self.log(f"[INFO] SSH command succesfully sent to {str(ip)}")
                     except BadHostKeyException as e:
                         self.log(f"[ERROR] Bad host key: {e}")
