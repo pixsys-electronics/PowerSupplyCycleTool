@@ -23,8 +23,35 @@ import re
 from pyModbusTCP.client import ModbusClient
 from config import TestBenchConfig
 from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
+from enum import Enum
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
+class ProcessingState(Enum):
+    Wait = 1
+    PsuInitProcedure = 2
+    PingProcedure = 3
+    ModbusProcedure = 4
+    ReversePingProcedure = 5
+    SshProcedure = 6
+    ReverseModbusProcedure = 7
+    Init = 9
+    Failure = 10
+    PsuPowerOnProcedure = 11
+    PsuPowerOffProcedure = 12
+    Setup = 13
+
+class ProcessingStatus:
+    state: ProcessingState
+    waiting_steps: int
+    total_waiting_steps: int
+    state_after_waiting: ProcessingState | None
+    
+    def __init__(self):
+        self.state = ProcessingState.Idle
+        self.waiting_steps = 0
+        self.total_waiting_steps = 0
+        self.state_after_waiting = None
 
 class Debouncer:
     def __init__(self, tk_root, delay_ms, callback):
@@ -174,6 +201,7 @@ class RigolTestApp(tk.Tk):
     ip_frame: IpTableFrame
     log_frame: LogFrame
     save_config_debouncer: Debouncer
+    status: ProcessingStatus
 
     def __init__(self, version):
         super().__init__()
@@ -219,6 +247,8 @@ class RigolTestApp(tk.Tk):
         self.after(100, self.process_gui_queue)
         
         self.save_config_debouncer = Debouncer(self, 500, self.save_config)
+        
+        self.status = ProcessingStatus()
 
         # TODO make this configurable from UI
 
@@ -765,6 +795,108 @@ class RigolTestApp(tk.Tk):
             self.alimentatore.select_output(channel)
             self.alimentatore.toggle_output(channel, state)
     
+    def test_step(self, dt: float):
+        match self.status.state:
+            
+            case ProcessingState.Init:
+                self.status.state = ProcessingState.Setup
+            
+            case ProcessingState.Setup:
+                self.cycle_defectives.clear()
+                self.t0 = None
+                self.cycle_count += 1
+                self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
+                self.log(f"[INFO] Cycle {self.cycle_count}")
+                if self.config.connection.psu_enabled:
+                    self.status.state = ProcessingState.PsuInitProcedure
+                else:
+                    self.status.state = ProcessingState.PingProcedure                    
+            
+            case ProcessingState.Wait:
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = self.status.state_after_waiting
+                else:
+                    self.state_waiting_steps += 1
+
+            case ProcessingState.PsuInitProcedure:
+                try:
+                    self.psu_connect()
+                    self.psu_init()
+                except Exception as e:
+                    self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
+                    self.status.state = ProcessingState.Failure
+                else:
+                    if not self.config.ssh.enabled or \
+                        (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
+                        self.status.state = ProcessingState.PsuPowerOnProcedure
+
+            case ProcessingState.PingProcedure:
+                if not self.ping_procedure():
+                    return
+                if self.config.modbus.automatic_cycle_count_check_enabled:
+                    self.status.state = ProcessingState.ModbusProcedure
+                elif self.config.ssh.enabled:
+                    self.status.state = ProcessingState.SshProcedure
+                elif self.config.connection.psu_enabled:
+                    self.status.state = ProcessingState.PsuPowerOffProcedure
+                else:
+                    self.status.state = ProcessingState.PingProcedure
+
+            case ProcessingState.ModbusProcedure:
+                if not self.modbus_check_procedure():
+                    self.status.state = ProcessingState.Failure
+                    return
+                if self.config.ssh.enabled:
+                    self.status.state = ProcessingState.SshProcedure
+                elif self.config.connection.psu_enabled:
+                    self.status.state = ProcessingState.PsuPowerOffProcedure
+                else:
+                    self.status.state = ProcessingState.ReverseModbusProcedure
+
+            case ProcessingState.ReversePingProcedure:
+                if not self.reverse_ping_procedure():
+                    return
+                self.status.state = ProcessingState.Setup
+
+            case ProcessingState.SshProcedure:
+                if not self.ssh_procedure():
+                    self.status.state = ProcessingState.Failure
+                    return
+                if self.config.modbus.automatic_cycle_count_check_enabled:
+                    self.status.state = ProcessingState.ReverseModbusProcedure
+                else:
+                    self.status.state = ProcessingState.ReversePingProcedure
+
+            case ProcessingState.ReverseModbusProcedure:
+                if not self.reverse_modbus_check_procedure():
+                    return
+                self.status.state = ProcessingState.ReversePingProcedure
+            
+            case ProcessingState.PsuPowerOnProcedure:
+                try:
+                    self.psu_poweron()
+                except Exception as e:
+                    self.log(f"[ERRORE] Error while trying to switch on the PSU: {str(e)}")
+                    self.status.state = ProcessingState.Failure
+                else:
+                    self.log(f"[INFO] PSU is ON")
+                    self.status.state = ProcessingState.Wait
+                    self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
+                    self.status.state_after_waiting = ProcessingState.PingProcedure
+
+            case ProcessingState.PsuPowerOffProcedure:
+                try:
+                    self.psu_poweroff()
+                except Exception as e:
+                    self.log(f"[ERRORE] Error while trying to switch off the PSU: {str(e)}")
+                    self.status.state = ProcessingState.Failure
+                else:
+                    self.log(f"[INFO] PSU is OFF")
+                    self.status.state = ProcessingState.Setup
+            
+            case ProcessingState.Failure:
+                pass
+    
     def test_loop(self):
         """
         Loop principale di test:
@@ -782,7 +914,9 @@ class RigolTestApp(tk.Tk):
             except Exception as e:
                 self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
                 self.run_test = False
-                return
+        
+        if not self.run_test:
+            return
         
         # start the main loop
         while self.wait_with_stop_check(self.config.timing.loop_check_period):

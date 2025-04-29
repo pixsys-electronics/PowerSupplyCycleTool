@@ -1,6 +1,9 @@
 # PowerSupplyCycleTool
 Power supply tool
 
+## State machine
+![State machine image](assets/state_machine_schema.png)
+
 ## Env
 - Python 3.11.2
 
