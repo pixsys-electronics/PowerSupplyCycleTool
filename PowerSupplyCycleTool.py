@@ -706,6 +706,21 @@ class RigolTestApp(tk.Tk):
             self.log("[INFO] MODBUS procedure succesfully finished")
 
         return not cycle_count_failure
+
+    def reverse_modbus_check_procedure(self) -> bool:
+        ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
+        futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+        cycle_count_success = True
+        for ip,future in futures_dict.items():
+            try:
+                _ = future.result()
+                cycle_count_success = False
+                break     
+            except Exception as e:
+                pass
+        
+        return cycle_count_success
     
     def ssh_procedure(self) -> bool:
         self.log("[INFO] SSH procedure started")
@@ -819,7 +834,7 @@ class RigolTestApp(tk.Tk):
             if not self.run_test:
                 self.log("[INFO] Ping procedure stopped, exiting test loop")
                 break
-                
+            
             self.log("[INFO] Ping procedure succesfully finished")
             
             # update the anomaly count using the size of the cycle_defectives set
@@ -846,28 +861,42 @@ class RigolTestApp(tk.Tk):
                     self.log(f"[INFO] Test stopped, exiting test loop")
                     break
             
-            else:
-                if self.config.connection.psu_enabled:
-                    self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
-                    if not self.wait_with_stop_check(5):
-                        break
+            elif self.config.connection.psu_enabled:
+                self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
+                if not self.wait_with_stop_check(5):
+                    break
 
-                    self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
-                    try:
-                        self.psu_poweroff()
-                        self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
-                        if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
-                            break
-                    except Exception as e:
-                        self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
+                self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
+                try:
+                    self.psu_poweroff()
+                    self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
+                    if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
                         break
+                except Exception as e:
+                    self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
+                    break
+            
+            if self.config.modbus.automatic_cycle_count_check_enabled:
+                self.log(f"[INFO] Reverse MODBUS procedure started")            
+                while self.wait_with_stop_check(self.config.timing.loop_check_period):
+                    if self.is_paused:
+                        self.log("[INFO] Reverse MODBUS procedure paused")
+                        continue
+                    if self.reverse_modbus_check_procedure():
+                        break
+                
+                if not self.run_test:
+                    self.log("[INFO] Reverse MODBUS procedure stopped, exiting test loop")
+                    break
+            
+                self.log("[INFO] Reverse MODBUS procedure succesfully finished")
             
             # start the reverse pinging loop
             # it exits if the ping is failed (no URL has answered)
             self.log(f"[INFO] Reverse ping procedure started")
             while self.wait_with_stop_check(self.config.timing.loop_check_period):
                 if self.is_paused:
-                    self.log("[INFO] Ping procedure paused")
+                    self.log("[INFO] Reverse ping procedure paused")
                     continue
                 if self.reverse_ping_procedure():
                     break
