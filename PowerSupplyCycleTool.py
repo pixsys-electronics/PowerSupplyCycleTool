@@ -71,7 +71,7 @@ def run_ssh_command(server: IPv4Address, username: str, password: str, command: 
     ssh.close()
 
 def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int):
-    c = ModbusClient(host=str(host), auto_open=True, auto_close=True)
+    c = ModbusClient(host=str(host), auto_open=True, auto_close=True, timeout=5)
     regs = c.read_holding_registers(reg_addr, reg_num)
     return regs
 
@@ -654,6 +654,24 @@ class RigolTestApp(tk.Tk):
         
         return False
     
+    # returns True every url has not responded to the ping, otherwise False
+    def reverse_ping(self) -> bool:
+        # ping only the URLs that have answered
+        url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is not None])
+        detection_times = self.ping_with_detection_time(url_list_to_ping)
+        # remove the valid responses
+        detection_times_valid = {k: v for k,v in detection_times.items() if v is None}
+        
+        for url,detection_time in detection_times_valid.items():
+            self.detection_times[url] = detection_time
+            self.gui_queue.put(('update_tree', url, ""))
+            self.log(f"[INFO] URL {url} stopped answering")
+        
+        if all(self.detection_times[ip] is None for ip in self.urls):
+            return True
+
+        return False
+    
     def psu_connect(self):
         self.alimentatore.connect(self.config.connection.psu_address)        
     
@@ -751,12 +769,11 @@ class RigolTestApp(tk.Tk):
             self.anomaly_count = self.anomaly_count + len(self.cycle_defectives)
             self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
             
-            ip_list = [ip_from_url(url) for url in self.urls]
-            ip_list = [ip for ip in ip_list if ip is not None]
-            
             # check if everyone has the same cycle count reading from registers using MODBUS protocol
             if self.config.modbus.automatic_cycle_count_check_enabled:
                 self.log(f"[INFO] MODBUS procedure started")
+                ip_list = [ip_from_url(url) for url in self.urls]
+                ip_list = [ip for ip in ip_list if ip is not None]
                 futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
                 cycle_count_failure = False
                 for ip,future in futures_dict.items():
@@ -844,7 +861,23 @@ class RigolTestApp(tk.Tk):
                     except Exception as e:
                         self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
                         break
-                
+            
+            # start the reverse pinging loop
+            # it exits if the ping is failed (no URL has answered)
+            self.log(f"[INFO] Reverse ping procedure started")
+            while self.wait_with_stop_check(self.config.timing.loop_check_period):
+                if self.is_paused:
+                    self.log("[INFO] Ping procedure paused")
+                    continue
+                if self.reverse_ping():
+                    break
+            
+            if not self.run_test:
+                self.log("[INFO] Ping procedure stopped, exiting test loop")
+                break
+            
+            self.log("[INFO] Reverse ping procedure succesfully finished")
+            
         if not self.test_stopped_intentionally and self.config.connection.psu_enabled:
             self.log("[INFO] Spegnimento finale dell'alimentatore...")
             try:
