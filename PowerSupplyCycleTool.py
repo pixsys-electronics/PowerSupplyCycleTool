@@ -613,7 +613,7 @@ class RigolTestApp(tk.Tk):
         return detection_times
     
     # returns True every url of the urls list has answered, otherwise it returns False
-    def ping(self) -> bool:
+    def ping_procedure(self) -> bool:
         # ping only the URLs that havent' answered yet and save their detection times
         url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is None])
         detection_times = self.ping_with_detection_time(url_list_to_ping)
@@ -655,7 +655,7 @@ class RigolTestApp(tk.Tk):
         return False
     
     # returns True every url has not responded to the ping, otherwise False
-    def reverse_ping(self) -> bool:
+    def reverse_ping_procedure(self) -> bool:
         # ping only the URLs that have answered
         url_list_to_ping = set([url for url in self.urls if self.detection_times[url] is not None])
         detection_times = self.ping_with_detection_time(url_list_to_ping)
@@ -671,6 +671,63 @@ class RigolTestApp(tk.Tk):
             return True
 
         return False
+    
+    # returns True if the modbus procedure has succesfully finished, otherwise False
+    def modbus_check_procedure(self) -> bool:
+        self.log(f"[INFO] MODBUS procedure started")
+        ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
+        futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+        cycle_count_failure = False
+        for ip,future in futures_dict.items():
+            try:
+                regs = future.result()
+                if regs is None:
+                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    cycle_count_failure = True
+                    break
+                counter = regs[0]
+                if counter != self.cycle_count:
+                    self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
+                    cycle_count_failure = True
+                    break
+
+                self.log(f"[INFO] {str(ip)} cycle count is up-to-date")
+                
+            except Exception as e:
+                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                cycle_count_failure = True
+                break
+        
+        # if something went wrong during the cycle count check, byee
+        if cycle_count_failure:
+            self.log("[INFO] MODBUS procedure failed")
+        else:
+            self.log("[INFO] MODBUS procedure succesfully finished")
+
+        return not cycle_count_failure
+    
+    def ssh_procedure(self) -> bool:
+        self.log("[INFO] SSH procedure started")
+        ssh_failure = False
+        ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
+        futures_dict = broadcast_ssh_command(ip_list, self.config.ssh.username, self.config.ssh.password, self.config.ssh.command)
+        for ip,future in futures_dict.items():
+            try:
+                future.result()
+                self.log(f"[INFO] SSH command succesfully sent to {str(ip)}")
+            except Exception as e:
+                self.log(f"[ERROR] {e}")
+                ssh_failure = True
+                break
+        
+        if ssh_failure:
+            self.log("[INFO] SSH procedure failed")
+        else:        
+            self.log("[INFO] SSH procedure succesfully finished")
+
+        return not ssh_failure
     
     def psu_connect(self):
         self.alimentatore.connect(self.config.connection.psu_address)        
@@ -756,7 +813,7 @@ class RigolTestApp(tk.Tk):
                 if self.is_paused:
                     self.log("[INFO] Ping procedure paused")
                     continue
-                if self.ping():
+                if self.ping_procedure():
                     break
             
             if not self.run_test:
@@ -771,76 +828,19 @@ class RigolTestApp(tk.Tk):
             
             # check if everyone has the same cycle count reading from registers using MODBUS protocol
             if self.config.modbus.automatic_cycle_count_check_enabled:
-                self.log(f"[INFO] MODBUS procedure started")
-                ip_list = [ip_from_url(url) for url in self.urls]
-                ip_list = [ip for ip in ip_list if ip is not None]
-                futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
-                cycle_count_failure = False
-                for ip,future in futures_dict.items():
-                    try:
-                        regs = future.result()
-                        if regs is None:
-                            self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
-                            continue
-                        counter = regs[0]
-                        if counter != self.cycle_count:
-                            self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
-                            cycle_count_failure = True
-                            break
-
-                        self.log(f"[INFO] {str(ip)} cycle count is up-to-date")
-                        
-                    except Exception as e:
-                        self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
-                        cycle_count_failure = True
-                        break
-                
-                # if something went wrong during the cycle count check, byee
-                if cycle_count_failure:
-                    self.log("[INFO] MODBUS procedure failed, exiting test loop")
+                modbus_procedure_success = self.modbus_check_procedure()
+                if not modbus_procedure_success:
                     break
             
             if self.config.ssh.enabled:
-                ssh_failure = False
                 self.log("[INFO] Waiting 5 seconds before starting SSH procedure")
                 if not self.wait_with_stop_check(5):
                     self.log("[INFO] SSH procedure stopped, exiting test loop")
                     break
-                self.log("[INFO] SSH procedure started")
-                ip_list = [ip_from_url(url) for url in self.urls]
-                ip_list = [ip for ip in ip_list if ip is not None]
-                futures_dict = broadcast_ssh_command(ip_list, self.config.ssh.username, self.config.ssh.password, self.config.ssh.command)
-                for ip,future in futures_dict.items():
-                    try:
-                        future.result()
-                        self.log(f"[INFO] SSH command succesfully sent to {str(ip)}")
-                    except BadHostKeyException as e:
-                        self.log(f"[ERROR] Bad host key: {e}")
-                        ssh_failure = True
-                        break
-                    except AuthenticationException as e:
-                        self.log(f"[ERROR] Authentication exception: {e}")
-                        ssh_failure = True
-                        break
-                    except socket.error as e:
-                        self.log(f"[ERROR] socket error: {e}")
-                        ssh_failure = True
-                        break
-                    except SSHException as e:
-                        self.log(f"[ERROR] SSH exception: {e}")
-                        ssh_failure = True
-                        break
-                    except Exception as e:
-                        self.log(f"[ERROR] Generic error: {e}")
-                        ssh_failure = True
-                        break
                 
-                if ssh_failure:
-                    self.log("[INFO] SSH procedure failed, exiting test loop")
+                ssh_procedure_success = self.ssh_procedure()
+                if not ssh_procedure_success:
                     break
-                
-                self.log("[INFO] SSH procedure succesfully finished")
-                self.log(f"[INFO] Waiting {self.config.timing.poweroff_delay} before the next test iteration")
                 
                 if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
                     self.log(f"[INFO] Test stopped, exiting test loop")
@@ -869,7 +869,7 @@ class RigolTestApp(tk.Tk):
                 if self.is_paused:
                     self.log("[INFO] Ping procedure paused")
                     continue
-                if self.reverse_ping():
+                if self.reverse_ping_procedure():
                     break
             
             if not self.run_test:
