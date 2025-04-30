@@ -103,6 +103,8 @@ class TestbenchApp(tk.Tk):
     status: ProcessingStatus
     modbus_timeout: float = 5
     ping_timeout: float = 3
+    state_machine_dt = 0.5
+    default_waiting_time = 5
     frames: TestbenchFrames
 
     def __init__(self, version):
@@ -364,29 +366,41 @@ class TestbenchApp(tk.Tk):
             
     def on_commands_start_test(self):
         """Avvia il test in un thread separato, reimpostando contatori e flag."""
-        if not self.run_test:
-            self.run_test = True
-            self.is_paused = False
-            self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
-            self.frames.manual_controls_frame.set_pause_button_text("Pausa")
-            self.log("[INFO] Test avviato.")
-            self.test_start_time = time.time()
-            self.update_elapsed_time()
-            self.test_stopped_intentionally = False
-            self.cycle_count = self.config.timing.cycle_start
-            self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-            self.anomaly_count = 0
-            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-            self.report_filename = self.make_report_filename()
-            report_folderpath = os.path.join(os.getcwd(), self.report_folder)
-            os.makedirs(report_folderpath, exist_ok=True)
-            self.report_filepath = os.path.join(report_folderpath, self.report_filename)
-            if self.report_filepath:
-                self.write_test_start_line()
-            else:
-                self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
-            test_thread = threading.Thread(target=self.test_loop, daemon=True)
-            test_thread.start()
+        if self.run_test:
+            return
+        
+        self.run_test = True
+        self.is_paused = False
+        self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
+        self.frames.manual_controls_frame.set_pause_button_text("Pausa")
+        self.log("[INFO] Test avviato.")
+        self.test_start_time = time.time()
+        self.update_elapsed_time()
+        self.test_stopped_intentionally = False
+        self.cycle_count = self.config.timing.cycle_start
+        self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
+        self.anomaly_count = 0
+        self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+        self.report_filename = self.make_report_filename()
+        report_folderpath = os.path.join(os.getcwd(), self.report_folder)
+        os.makedirs(report_folderpath, exist_ok=True)
+        self.report_filepath = os.path.join(report_folderpath, self.report_filename)
+        if self.report_filepath:
+            self.write_test_start_line()
+        else:
+            self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
+        self.status = ProcessingStatus()
+        test_thread = threading.Thread(target=self.state_machine_thread, daemon=True)
+        test_thread.start()
+    
+    def state_machine_thread(self):
+        while self.run_test:
+            time.sleep(self.state_machine_dt)
+            if self.is_paused:
+                continue
+            self.test_step(self.state_machine_dt)
+        
+        self.log("[INFO] Test loop has been stopped")
     
     def on_commands_stop_test(self):
         """Ferma il test in modo pulito."""
@@ -695,6 +709,12 @@ class TestbenchApp(tk.Tk):
             self.alimentatore.select_output(channel)
             self.alimentatore.toggle_output(channel, state)
     
+    def try_state_transition(self, next_state: ProcessingState):
+        self.status.waiting_steps += 1
+        if self.status.waiting_steps == self.status.total_waiting_steps:
+            self.status.state = next_state
+            self.status.waiting_steps = 0
+    
     def test_step(self, dt: float):
         match self.status.state:
             
@@ -728,10 +748,7 @@ class TestbenchApp(tk.Tk):
                     self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
             
             case ProcessingState.SetupDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.Setup
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.Setup)
             
             case ProcessingState.Setup:
                 self.cycle_defectives.clear()
@@ -751,30 +768,32 @@ class TestbenchApp(tk.Tk):
                     self.status.state = ProcessingState.PsuPowerOn
                 else:
                     self.status.state = ProcessingState.PingDelay
+                    self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
             
             case ProcessingState.PingDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.Ping
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.Ping)
 
             case ProcessingState.Ping:
                 if not self.ping_procedure():
                     return
+                # update the anomaly count using the size of the cycle_defectives set
+                self.anomaly_count += len(self.cycle_defectives)
+                self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
+                
                 if self.config.modbus.automatic_cycle_count_check_enabled:
                     self.status.state = ProcessingState.ModbusDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
                 elif self.config.ssh.enabled:
                     self.status.state = ProcessingState.SshDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
                 elif self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOffDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
                 else:
                     self.status.state = ProcessingState.Setup
             
             case ProcessingState.ModbusDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.Modbus
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.Modbus)
             
             case ProcessingState.Modbus:
                 if not self.modbus_check_procedure():
@@ -782,16 +801,15 @@ class TestbenchApp(tk.Tk):
                     return
                 if self.config.ssh.enabled:
                     self.status.state = ProcessingState.SshDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
                 elif self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOffDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
                 else:
                     self.status.state = ProcessingState.Setup
             
             case ProcessingState.SshDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.Ssh
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.Ssh)
             
             case ProcessingState.Ssh:
                 if not self.ssh_procedure():
@@ -799,14 +817,13 @@ class TestbenchApp(tk.Tk):
                     return
                 if self.config.modbus.automatic_cycle_count_check_enabled:
                     self.status.state = ProcessingState.ReverseModbusDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
                 else:
                     self.status.state = ProcessingState.ReversePingDelay
+                    self.status.total_waiting_steps = int(self.default_waiting_time / dt)
             
             case ProcessingState.ReversePingDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.ReversePing
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.ReversePing)
             
             case ProcessingState.ReversePing:
                 if not self.reverse_ping_procedure():
@@ -814,21 +831,16 @@ class TestbenchApp(tk.Tk):
                 self.status.state = ProcessingState.Setup
             
             case ProcessingState.ReverseModbusDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.ReverseModbus
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.ReverseModbus)
             
             case ProcessingState.ReverseModbus:
                 if not self.reverse_modbus_check_procedure():
                     return
                 self.status.state = ProcessingState.ReversePingDelay
+                self.status.total_waiting_steps = int(self.default_waiting_time / dt)
             
             case ProcessingState.PsuPowerOffDelay:
-                self.status.waiting_steps += 1
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = ProcessingState.PsuPowerOff
-                    self.status.waiting_steps = 0
+                self.try_state_transition(ProcessingState.PsuPowerOff)
 
             case ProcessingState.PsuPowerOff:
                 try:
@@ -839,6 +851,7 @@ class TestbenchApp(tk.Tk):
                 else:
                     self.log(f"[INFO] PSU is OFF")
                     self.status.state = ProcessingState.SetupDelay
+                    self.status.total_waiting_steps = int(self.config.timing.poweroff_delay / dt)
             
             case ProcessingState.Failure:
                 pass
