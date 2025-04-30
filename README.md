@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 ## Run
 ```sh
-python PowerSupplyCycleTool.py
+python src/main.py
 ```
 
 ## State machine
