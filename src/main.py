@@ -60,12 +60,7 @@ class Debouncer:
         self._job = self.root.after(self.delay, lambda: self.callback(*args, **kwargs))
 
 
-class RigolTestApp(tk.Tk):
-    url_list_filename = 'urls.csv'
-    config_filename = 'config.json'
-    window_title = "Rigol Test GUI"
-    window_w = 1280
-    window_h = 800
+class TestbenchFrames:
     psu_frame: PsuFrame
     timing_frame: TimingFrame
     ssh_frame: SSHFrame
@@ -75,10 +70,40 @@ class RigolTestApp(tk.Tk):
     info_frame: InfoFrame
     ip_frame: IpTableFrame
     log_frame: LogFrame
+    
+    def __init__(
+        self,
+        psu_frame: PsuFrame,
+        timing_frame: TimingFrame,
+        ssh_frame: SSHFrame,
+        modbus_frame: ModbusFrame,
+        file_frame: FileFrame,
+        manual_controls_frame: ManualControlsFrame,
+        info_frame: InfoFrame,
+        ip_frame: IpTableFrame,
+        log_frame: LogFrame
+    ):    
+        self.psu_frame = psu_frame
+        self.timing_frame = timing_frame
+        self.ssh_frame = ssh_frame
+        self.modbus_frame = modbus_frame
+        self.file_frame = file_frame
+        self.manual_controls_frame = manual_controls_frame
+        self.info_frame = info_frame
+        self.ip_frame = ip_frame
+        self.log_frame = log_frame
+
+class TestbenchApp(tk.Tk):
+    url_list_filename = 'urls.csv'
+    config_filename = 'config.json'
+    window_title = "Rigol Test GUI"
+    window_w = 1280
+    window_h = 800
     save_config_debouncer: Debouncer
     status: ProcessingStatus
     modbus_timeout: float = 5
     ping_timeout: float = 3
+    frames: TestbenchFrames
 
     def __init__(self, version):
         super().__init__()
@@ -149,85 +174,84 @@ class RigolTestApp(tk.Tk):
         top_left_frame = tk.Frame(top_frame)
         top_left_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nsew")
-        self.psu_frame.set_psu_enabled(self.config.connection.psu_enabled)
-        self.psu_frame.set_psu_ip(self.config.connection.psu_address)
-        self.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
-        self.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
-        
-        self.timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nsew")
-        self.timing_frame.set_precheck(self.config.timing.pre_check_delay)
-        self.timing_frame.set_checkloop(self.config.timing.loop_check_period)
-        self.timing_frame.set_maxdelay(self.config.timing.max_startup_delay)
-        self.timing_frame.set_speg(self.config.timing.poweroff_delay)
-        self.timing_frame.set_cycle_start(self.config.timing.cycle_start)
-        
-        self.timing_frame.set_precheck_cb(self.on_timing_precheck_change)
-        self.timing_frame.set_maxdelay_cb(self.on_timing_maxdelay_change)
-        self.timing_frame.set_speg_cb(self.on_timing_speg_change)
-        self.timing_frame.set_checkloop_cb(self.on_timing_checkloop_change)
-        self.timing_frame.set_cycle_start_cb(self.on_timing_cycle_start_change)
-        
-        self.ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nsew")
-        self.ssh_frame.set_ssh_enabled(self.config.ssh.enabled)
-        self.ssh_frame.set_username(self.config.ssh.username)
-        self.ssh_frame.set_password(self.config.ssh.password)
-        self.ssh_frame.set_command(self.config.ssh.command)
-        
-        self.ssh_frame.set_ssh_enabled_change_cb(self.on_ssh_enabled_change)
-        self.ssh_frame.set_username_change_cb(self.on_ssh_username_change)
-        self.ssh_frame.set_password_change_cb(self.on_ssh_password_change)
-        self.ssh_frame.set_command_change_cb(self.on_ssh_command_change)
-        
-        self.modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nsew")
-        self.modbus_frame.set_modbus_enable(self.config.modbus.automatic_cycle_count_check_enabled)
-        self.modbus_frame.set_register_address(self.config.modbus.register_address)
-        self.modbus_frame.set_register_value(self.config.modbus.register_value)
-        
-        self.modbus_frame.set_modbus_enable_change_cb(self.on_modbus_enable_change)
-        self.modbus_frame.set_register_address_change_cb(self.on_modbus_register_address_change)
-        self.modbus_frame.set_register_value_change_cb(self.on_modbus_register_value_change)
-        self.modbus_frame.set_read_register_press_cb(self.on_modbus_read_press)
-        self.modbus_frame.set_write_register_press_cb(self.on_modbus_write_press)
-        self.modbus_frame.set_reset_cycle_count_press_cb(self.on_modbus_reset_cycle_count_press)
-        self.modbus_frame.set_reset_time_count_press_cb(self.on_modbus_reset_time_count_press)
-        
         # TOP RIGHT FRAME
         top_right_frame = tk.Frame(top_frame)
         top_right_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.log_frame = LogFrame(top_right_frame, 0, 0, 5, 5, "nsew")
-        
         # BOTTOM FRAME
         bottom_frame = tk.Frame(self)
         bottom_frame.grid(row=1, column=0, sticky="nsew")
-        # bottom_frame.grid_rowconfigure(0, weight=1)
-        # bottom_frame.grid_columnconfigure(0, weight=1)
-        # bottom_frame.grid_columnconfigure(1, weight=1)
-
+        
         # BOTTOM LEFT FRAME
         bottom_left_frame = tk.Frame(bottom_frame)
         bottom_left_frame.grid(row=0, column=0, sticky="nsew")
-
-        self.manual_controls_frame = ManualControlsFrame(bottom_left_frame, 0, 0, 5, 5, "nsew")
-        self.manual_controls_frame.set_start_button_press_cb(self.on_commands_start_test)
-        self.manual_controls_frame.set_stop_button_press_cb(self.on_commands_stop_test)
-        self.manual_controls_frame.set_pause_button_press_cb(self.on_commands_toggle_pause)
-        self.manual_controls_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
-        self.manual_controls_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
-        
-        self.info_frame = InfoFrame(bottom_left_frame, 1, 0, 5, 5, "nsew")
-        self.ip_frame = IpTableFrame(bottom_left_frame, 2, 0, 5, 5, "nsew")
         
         # BOTTOM RIGHT FRAME
         bottom_right_frame = tk.Frame(bottom_frame)
         bottom_right_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.file_frame = FileFrame(bottom_right_frame, 0, 0, 5, 5, "nsew")
+        psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nsew")
+        timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nsew")
+        ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nsew")
+        modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nsew")
+        manual_controls_frame = ManualControlsFrame(bottom_left_frame, 0, 0, 5, 5, "nsew")
+        info_frame = InfoFrame(bottom_left_frame, 1, 0, 5, 5, "nsew")
+        ip_frame = IpTableFrame(bottom_left_frame, 2, 0, 5, 5, "nsew")
+        file_frame = FileFrame(bottom_right_frame, 0, 0, 5, 5, "nsew")
+        log_frame = LogFrame(top_right_frame, 0, 0, 5, 5, "nsew")
+        
+        self.frames = TestbenchFrames(psu_frame, timing_frame, ssh_frame, modbus_frame, file_frame, manual_controls_frame, info_frame, ip_frame, log_frame)
+        
+        self.frames.psu_frame.set_psu_enabled(self.config.connection.psu_enabled)
+        self.frames.psu_frame.set_psu_ip(self.config.connection.psu_address)
+        self.frames.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
+        self.frames.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
+        
+        self.frames.timing_frame.set_precheck(self.config.timing.pre_check_delay)
+        self.frames.timing_frame.set_checkloop(self.config.timing.loop_check_period)
+        self.frames.timing_frame.set_maxdelay(self.config.timing.max_startup_delay)
+        self.frames.timing_frame.set_speg(self.config.timing.poweroff_delay)
+        self.frames.timing_frame.set_cycle_start(self.config.timing.cycle_start)
+        
+        self.frames.timing_frame.set_precheck_cb(self.on_timing_precheck_change)
+        self.frames.timing_frame.set_maxdelay_cb(self.on_timing_maxdelay_change)
+        self.frames.timing_frame.set_speg_cb(self.on_timing_speg_change)
+        self.frames.timing_frame.set_checkloop_cb(self.on_timing_checkloop_change)
+        self.frames.timing_frame.set_cycle_start_cb(self.on_timing_cycle_start_change)
+        
+        self.frames.ssh_frame.set_ssh_enabled(self.config.ssh.enabled)
+        self.frames.ssh_frame.set_username(self.config.ssh.username)
+        self.frames.ssh_frame.set_password(self.config.ssh.password)
+        self.frames.ssh_frame.set_command(self.config.ssh.command)
+        
+        self.frames.ssh_frame.set_ssh_enabled_change_cb(self.on_ssh_enabled_change)
+        self.frames.ssh_frame.set_username_change_cb(self.on_ssh_username_change)
+        self.frames.ssh_frame.set_password_change_cb(self.on_ssh_password_change)
+        self.frames.ssh_frame.set_command_change_cb(self.on_ssh_command_change)
+        
+        self.frames.modbus_frame.set_modbus_enable(self.config.modbus.automatic_cycle_count_check_enabled)
+        self.frames.modbus_frame.set_register_address(self.config.modbus.register_address)
+        self.frames.modbus_frame.set_register_value(self.config.modbus.register_value)
+        
+        self.frames.modbus_frame.set_modbus_enable_change_cb(self.on_modbus_enable_change)
+        self.frames.modbus_frame.set_register_address_change_cb(self.on_modbus_register_address_change)
+        self.frames.modbus_frame.set_register_value_change_cb(self.on_modbus_register_value_change)
+        self.frames.modbus_frame.set_read_register_press_cb(self.on_modbus_read_press)
+        self.frames.modbus_frame.set_write_register_press_cb(self.on_modbus_write_press)
+        self.frames.modbus_frame.set_reset_cycle_count_press_cb(self.on_modbus_reset_cycle_count_press)
+        self.frames.modbus_frame.set_reset_time_count_press_cb(self.on_modbus_reset_time_count_press)
+        
+        self.frames.manual_controls_frame.set_start_button_press_cb(self.on_commands_start_test)
+        self.frames.manual_controls_frame.set_stop_button_press_cb(self.on_commands_stop_test)
+        self.frames.manual_controls_frame.set_pause_button_press_cb(self.on_commands_toggle_pause)
+        self.frames.manual_controls_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
+        self.frames.manual_controls_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
+        
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path) as f: content = f.read()
-        self.file_frame.load_text(content)
-        self.file_frame.set_apply_button_press_cb(self.on_file_apply_press)
+        
+        self.frames.file_frame.load_text(content)
+        self.frames.file_frame.set_apply_button_press_cb(self.on_file_apply_press)
         
         self.update()
         self.geometry("")
@@ -343,8 +367,8 @@ class RigolTestApp(tk.Tk):
         if not self.run_test:
             self.run_test = True
             self.is_paused = False
-            self.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
-            self.manual_controls_frame.set_pause_button_text("Pausa")
+            self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
+            self.frames.manual_controls_frame.set_pause_button_text("Pausa")
             self.log("[INFO] Test avviato.")
             self.test_start_time = time.time()
             self.update_elapsed_time()
@@ -373,12 +397,12 @@ class RigolTestApp(tk.Tk):
     def on_commands_toggle_pause(self):
         self.is_paused = not self.is_paused
         if self.is_paused:
-            self.manual_controls_frame.set_pause_status_label("Stato: In Pausa")
-            self.manual_controls_frame.set_pause_button_text("Riprendi")
+            self.frames.manual_controls_frame.set_pause_status_label("Stato: In Pausa")
+            self.frames.manual_controls_frame.set_pause_button_text("Riprendi")
             self.log("[INFO] Test in pausa.")
         else:
-            self.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
-            self.manual_controls_frame.set_pause_button_text("Pausa")
+            self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
+            self.frames.manual_controls_frame.set_pause_button_text("Pausa")
             self.log("[INFO] Test ripreso.")
 
     def on_commands_force_power_on(self):
@@ -403,7 +427,7 @@ class RigolTestApp(tk.Tk):
             self.log(f"[ERRORE] Errore durante lo spegnimento forzato: {str(e)}")
     
     def on_file_apply_press(self):
-        content = self.file_frame.get_text()
+        content = self.frames.file_frame.get_text()
         self.urls = url_list_from_csv(content)
         self.refresh_address_table()
         
@@ -428,13 +452,13 @@ class RigolTestApp(tk.Tk):
     
     def refresh_address_table(self):
         # Pulisce la Treeview
-        self.ip_frame.tree_clear()
+        self.frames.ip_frame.tree_clear()
         
         # Resetta i tempi di rilevamento
         self.detection_times.clear()
         for ip in self.urls:
             self.detection_times[ip] = None
-            self.ip_frame.tree_insert(ip, (ip, ""), ('normal',))
+            self.frames.ip_frame.tree_insert(ip, (ip, ""), ('normal',))
             self.log(f"[INFO] URL found: {ip}")
         
     def log(self, message):
@@ -449,8 +473,8 @@ class RigolTestApp(tk.Tk):
             except queue.Empty:
                 break
             else:
-                self.log_frame.add_log(msg)
-                self.log_frame.scroll_down()
+                self.frames.log_frame.add_log(msg)
+                self.frames.log_frame.scroll_down()
         self.after(500, self.process_log_queue)
 
     def process_gui_queue(self):
@@ -461,18 +485,18 @@ class RigolTestApp(tk.Tk):
                 if gui_msg[0] == 'update_label':
                     _, label_name, text = gui_msg
                     if label_name == 'anomaly_count_label':
-                        self.info_frame.set_anomaly_count_label(text)
+                        self.frames.info_frame.set_anomaly_count_label(text)
                     elif label_name == 'cycle_count_label':
-                        self.info_frame.set_cycle_count_label(text)
+                        self.frames.info_frame.set_cycle_count_label(text)
                 elif gui_msg[0] == 'update_tree':
                     ip, detected_time = gui_msg[1], gui_msg[2]
-                    self.ip_frame.tree_set(ip, "detected", detected_time)
+                    self.frames.ip_frame.tree_set(ip, "detected", detected_time)
                 elif gui_msg[0] == 'highlight_error':
                     ip = gui_msg[1]
-                    self.ip_frame.tree_item(ip, ('error',))
+                    self.frames.ip_frame.tree_item(ip, ('error',))
                 elif gui_msg[0] == 'remove_tag':
                     ip = gui_msg[1]
-                    self.ip_frame.tree_item(ip, ('normal',))
+                    self.frames.ip_frame.tree_item(ip, ('normal',))
             except queue.Empty:
                 break
             except Exception as e:
@@ -1002,7 +1026,7 @@ class RigolTestApp(tk.Tk):
             hours, remainder = divmod(int(elapsed), 3600)
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-            self.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
+            self.frames.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
             self.after(1000, self.update_elapsed_time)
     
     def reset_cycle_count(self):
@@ -1035,5 +1059,5 @@ class RigolTestApp(tk.Tk):
 # Avvio dell'applicazione
 if __name__ == "__main__":
     version =  get_current_git_commit_hash()
-    app = RigolTestApp(version)
+    app = TestbenchApp(version)
     app.mainloop()
