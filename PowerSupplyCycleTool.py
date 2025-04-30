@@ -101,22 +101,22 @@ def run_ssh_command(server: IPv4Address, username: str, password: str, command: 
     _ = ssh.exec_command(command)
     ssh.close()
 
-def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int):
-    c = ModbusClient(host=str(host), auto_open=True, auto_close=True, timeout=5)
+def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int, timeout: float):
+    c = ModbusClient(host=str(host), auto_open=True, auto_close=True, timeout=timeout)
     regs = c.read_holding_registers(reg_addr, reg_num)
     return regs
 
-def run_modbus_write_regiter(host: IPv4Address, reg_addr: int, value: int):
-    c = ModbusClient(host=str(host), auto_open=True, auto_close=True)
+def run_modbus_write_regiter(host: IPv4Address, reg_addr: int, value: int, timeout: float):
+    c = ModbusClient(host=str(host), auto_open=True, auto_close=True, timeout=timeout)
     ok = c.write_single_register(reg_addr, value)
     return ok
 
 # check if a given url returns HTTP code 200 (success) using curl
 # throws subprocess.TimeoutExpired or a generic exception
-def curl(url: str) -> (datetime.datetime | None):
+def curl(url: str, timeout: float) -> (datetime.datetime | None):
     result = subprocess.run(
         ['curl', '-k', '-s', '-o', '/dev/null', '-w', '%{http_code}', url],
-        timeout=3,
+        timeout=timeout,
         capture_output=True,
         text=True
     )
@@ -128,13 +128,13 @@ def curl(url: str) -> (datetime.datetime | None):
 
 # returns an dict where the key is an URL (string) and the value is its completed future
 # this way we can handle the future result outside of this function
-def broadcast_ping(url_list: set[str]) -> dict[str, Future[datetime.datetime | None]]:
+def broadcast_ping(url_list: set[str], timeout: float) -> dict[str, Future[datetime.datetime | None]]:
     # spawn a bunch of workers to start the pinging process
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
         # run a different thread for each URL to ping and
         # create a dictionary where the future is the key and the URL is the value
-        future_to_ip = {executor.submit(curl, url): url for url in url_list}
+        future_to_ip = {executor.submit(curl, url, timeout): url for url in url_list}
         
         # wait until every thread has finished, then iterate over each response and check it
         for f in concurrent.futures.as_completed(future_to_ip.keys()):
@@ -159,10 +159,10 @@ def broadcast_ssh_command(ip_list: set[IPv4Address], username: str, password: st
     
     return future_results
 
-def broadcast_modbus_read_register(ip_list: set[IPv4Address], reg_addr: int, reg_num: int) -> dict[IPv4Address, Future[list | None]]:
+def broadcast_modbus_read_register(ip_list: set[IPv4Address], reg_addr: int, reg_num: int, timeout: float) -> dict[IPv4Address, Future[list | None]]:
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_ip = {executor.submit(run_modbus_read_registers, ip, reg_addr, reg_num): ip for ip in ip_list}
+        future_to_ip = {executor.submit(run_modbus_read_registers, ip, reg_addr, reg_num, timeout): ip for ip in ip_list}
         
         # wait until every thread has finished, then iterate over each response and check it
         for f in concurrent.futures.as_completed(future_to_ip.keys()):
@@ -171,10 +171,10 @@ def broadcast_modbus_read_register(ip_list: set[IPv4Address], reg_addr: int, reg
     
     return future_results
 
-def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, reg_value: int) -> dict[IPv4Address, Future[bool]]:
+def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, reg_value: int, timeout: float) -> dict[IPv4Address, Future[bool]]:
     future_results = dict()
     with ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_ip = {executor.submit(run_modbus_write_regiter, ip, reg_addr, reg_value): ip for ip in ip_list}
+        future_to_ip = {executor.submit(run_modbus_write_regiter, ip, reg_addr, reg_value, timeout): ip for ip in ip_list}
         
         # wait until every thread has finished, then iterate over each response and check it
         for f in concurrent.futures.as_completed(future_to_ip.keys()):
@@ -183,11 +183,11 @@ def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, re
     
     return future_results
 
-def broadcast_modbus_read_poweron_counter(ip_list: list[IPv4Address]) -> dict[IPv4Address, Future[list | None]]:
-    return broadcast_modbus_read_register(ip_list, 0, 1)
+def broadcast_modbus_read_poweron_counter(ip_list: list[IPv4Address], timeout: float) -> dict[IPv4Address, Future[list | None]]:
+    return broadcast_modbus_read_register(ip_list, 0, 1, timeout)
 
-def broadcast_modbus_write_poweron_counter(ip_list: list[IPv4Address], reg_value: int) -> dict[IPv4Address, Future[bool]]:
-    return broadcast_modbus_write_register(ip_list, 0, reg_value)
+def broadcast_modbus_write_poweron_counter(ip_list: list[IPv4Address], reg_value: int, timeout: float) -> dict[IPv4Address, Future[bool]]:
+    return broadcast_modbus_write_register(ip_list, 0, reg_value, timeout)
 
 class RigolTestApp(tk.Tk):
     url_list_filename = 'urls.csv'
@@ -206,6 +206,8 @@ class RigolTestApp(tk.Tk):
     log_frame: LogFrame
     save_config_debouncer: Debouncer
     status: ProcessingStatus
+    modbus_timeout: float = 5
+    ping_timeout: float = 3
 
     def __init__(self, version):
         super().__init__()
@@ -228,7 +230,6 @@ class RigolTestApp(tk.Tk):
         
         # Controllo del loop di test
         self.run_test = False
-        self.test_thread = None
         self.test_start_time = None
         
         # Contatori
@@ -450,7 +451,7 @@ class RigolTestApp(tk.Tk):
     def on_modbus_reset_cycle_count_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
+        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0, self.modbus_timeout)
         for ip,future in futures_dict.items():
             try:
                 ok = future.result()
@@ -489,8 +490,8 @@ class RigolTestApp(tk.Tk):
                 self.write_test_start_line()
             else:
                 self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
-            self.test_thread = threading.Thread(target=self.test_loop, daemon=True)
-            self.test_thread.start()
+            test_thread = threading.Thread(target=self.test_loop, daemon=True)
+            test_thread.start()
     
     def on_commands_stop_test(self):
         """Ferma il test in modo pulito."""
@@ -628,7 +629,7 @@ class RigolTestApp(tk.Tk):
     
     def ping_with_detection_time(self, url_list: list[str]) -> dict[str, (datetime.datetime | None)]:
         detection_times: dict[str, (datetime.datetime | None)] = dict()
-        url_futures = broadcast_ping(url_list)
+        url_futures = broadcast_ping(url_list, self.ping_timeout)
         
         response = None
         
@@ -711,7 +712,7 @@ class RigolTestApp(tk.Tk):
         self.log(f"[INFO] MODBUS procedure started")
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+        futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)
         cycle_count_failure = False
         for ip,future in futures_dict.items():
             try:
@@ -744,7 +745,7 @@ class RigolTestApp(tk.Tk):
     def reverse_modbus_check_procedure(self) -> bool:
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_read_poweron_counter(ip_list)
+        futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)
         cycle_count_success = True
         for ip,future in futures_dict.items():
             try:
@@ -1138,7 +1139,7 @@ class RigolTestApp(tk.Tk):
         self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0)
+        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0, self.modbus_timeout)
         for ip,future in futures_dict.items():
             try:
                 ok = future.result()
