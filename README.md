@@ -2,7 +2,7 @@
 Power supply tool
 
 ## State machine
-![State machine image](assets/state_machine_schema.png)
+![State machine image](assets/state_machine.png)
 
 ## Env
 - Python 3.11.2
