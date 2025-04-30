@@ -19,7 +19,7 @@ PingDecision3 --> PsuPowerOffDelay : [psu_enabled == true]
 PingDecision3 --> Setup : [psu_enabled == false]
 
 SSHDecision --> ReverseModbusDelay : [modbus_enabled == true]
-SSHDecision --> ReversePing : [modbus_enabled == false]
+SSHDecision --> ReversePingDelay : [modbus_enabled == false]
 
 ' states '
 Init --> PsuInit : [psu_enabled == true]
