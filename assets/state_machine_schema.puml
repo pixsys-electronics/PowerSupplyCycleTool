@@ -9,16 +9,16 @@ state PingDecision3 <<choice>>
 state SSHDecision <<choice>>
 
 ' decisions '
-PingDecision --> ModbusWait : [modbus_enabled == true]
+PingDecision --> ModbusDelay : [modbus_enabled == true]
 PingDecision --> PingDecision2 : [modbus_enabled == false]
 
-PingDecision2 --> SSHWait : [ssh_enabled == true]
+PingDecision2 --> SSHDelay : [ssh_enabled == true]
 PingDecision2 --> PingDecision3 : [ssh_enabled == false]
 
-PingDecision3 --> PsuPowerOffWait : [psu_enabled == true]
+PingDecision3 --> PsuPowerOffDelay : [psu_enabled == true]
 PingDecision3 --> Setup : [psu_enabled == false]
 
-SSHDecision --> ReverseModbusWait : [modbus_enabled == true]
+SSHDecision --> ReverseModbusDelay : [modbus_enabled == true]
 SSHDecision --> ReversePing : [modbus_enabled == false]
 
 ' states '
@@ -28,47 +28,47 @@ Init --> Setup : [psu_enabled == false]
 PsuInit --> Setup : [success == true]
 PsuInit --> Failure : [success == false]
 
-SetupWait --> Setup : [waiting_steps == total_waiting_steps]
-SetupWait --> SetupWait : [waiting_steps != total_waiting_steps]
+SetupDelay --> Setup : [waiting_steps == total_waiting_steps]
+SetupDelay --> SetupDelay : [waiting_steps != total_waiting_steps]
 
 Setup --> PsuPowerOn : [psu_enabled == true]
-Setup --> PingWait : [psu_enabled == false]
+Setup --> PingDelay : [psu_enabled == false]
 
-PsuPowerOn --> PingWait : [success == true]
+PsuPowerOn --> PingDelay : [success == true]
 PsuPowerOn --> Failure : [success == false]
 
-PingWait --> Ping : [waiting_steps == total_waiting_steps]
-PingWait --> PingWait : [waiting_steps != total_waiting_steps]
+PingDelay --> Ping : [waiting_steps == total_waiting_steps]
+PingDelay --> PingDelay : [waiting_steps != total_waiting_steps]
 
-PsuPowerOffWait -> PsuPowerOff : [waiting_steps == total_waiting_steps]
-PsuPowerOffWait -> PsuPowerOffWait : [waiting_steps != total_waiting_steps]
+PsuPowerOffDelay -> PsuPowerOff : [waiting_steps == total_waiting_steps]
+PsuPowerOffDelay -> PsuPowerOffDelay : [waiting_steps != total_waiting_steps]
 
-PsuPowerOff --> SetupWait : [success == true]
+PsuPowerOff --> SetupDelay : [success == true]
 PsuPowerOff --> Failure : [success == false]
 
 Ping --> PingDecision : [success == true]
 Ping --> Ping: [success == false]
 
-ModbusWait --> Modbus : [waiting_steps == total_waiting_steps]
-ModbusWait --> ModbusWait : [waiting_steps != total_waiting_steps]
+ModbusDelay --> Modbus : [waiting_steps == total_waiting_steps]
+ModbusDelay --> ModbusDelay : [waiting_steps != total_waiting_steps]
 
 Modbus --> PingDecision2 : [success == true]
 Modbus --> Failure : [success == false]
 
-SSHWait -> SSH : [waiting_steps == total_waiting_steps]
-SSHWait -> SSHWait : [waiting_steps != total_waiting_steps]
+SSHDelay -> SSH : [waiting_steps == total_waiting_steps]
+SSHDelay -> SSHDelay : [waiting_steps != total_waiting_steps]
 
 SSH --> SSHDecision : [success == true]
 SSH --> Failure : [success == false]
 
-ReverseModbusWait --> ReverseModbus : [waiting_steps == total_waiting_steps]
-ReverseModbusWait --> ReverseModbusWait : [waiting_steps != total_waiting_steps]
+ReverseModbusDelay --> ReverseModbus : [waiting_steps == total_waiting_steps]
+ReverseModbusDelay --> ReverseModbusDelay : [waiting_steps != total_waiting_steps]
 
 ReverseModbus --> ReverseModbus : [success == false]
-ReverseModbus --> ReversePingWait : [success == true]
+ReverseModbus --> ReversePingDelay : [success == true]
 
-ReversePingWait --> ReversePing : [waiting_steps == total_waiting_steps]
-ReversePingWait --> ReversePingWait : [waiting_steps != total_waiting_steps]
+ReversePingDelay --> ReversePing : [waiting_steps == total_waiting_steps]
+ReversePingDelay --> ReversePingDelay : [waiting_steps != total_waiting_steps]
 
 ReversePing --> ReversePing : [success == false]
 ReversePing --> Setup : [success == true]
