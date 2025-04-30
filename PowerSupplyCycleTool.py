@@ -28,30 +28,34 @@ from enum import Enum
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 class ProcessingState(Enum):
-    Wait = 1
-    PsuInitProcedure = 2
-    PingProcedure = 3
-    ModbusProcedure = 4
-    ReversePingProcedure = 5
-    SshProcedure = 6
-    ReverseModbusProcedure = 7
-    Init = 9
-    Failure = 10
-    PsuPowerOnProcedure = 11
-    PsuPowerOffProcedure = 12
-    Setup = 13
+    Init = 1
+    PsuInit = 2
+    Setup = 3
+    PsuPowerOn = 4
+    PingDelay = 5
+    Ping = 6
+    ModbusDelay = 7
+    Modbus = 8
+    SshDelay = 9
+    Ssh = 10
+    ReverseModbusDelay = 11
+    ReverseModbus = 12
+    ReversePingDelay = 13
+    ReversePing = 14
+    PsuPowerOffDelay = 15
+    PsuPowerOff = 16
+    Failure = 17
+    SetupDelay = 18
 
 class ProcessingStatus:
     state: ProcessingState
     waiting_steps: int
     total_waiting_steps: int
-    state_after_waiting: ProcessingState | None
     
     def __init__(self):
-        self.state = ProcessingState.Idle
+        self.state = ProcessingState.Init
         self.waiting_steps = 0
         self.total_waiting_steps = 0
-        self.state_after_waiting = None
 
 class Debouncer:
     def __init__(self, tk_root, delay_ms, callback):
@@ -799,26 +803,12 @@ class RigolTestApp(tk.Tk):
         match self.status.state:
             
             case ProcessingState.Init:
-                self.status.state = ProcessingState.Setup
-            
-            case ProcessingState.Setup:
-                self.cycle_defectives.clear()
-                self.t0 = None
-                self.cycle_count += 1
-                self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-                self.log(f"[INFO] Cycle {self.cycle_count}")
                 if self.config.connection.psu_enabled:
-                    self.status.state = ProcessingState.PsuInitProcedure
+                    self.status.state = ProcessingState.PsuInit
                 else:
-                    self.status.state = ProcessingState.PingProcedure                    
+                    self.status.state = ProcessingState.Setup
             
-            case ProcessingState.Wait:
-                if self.status.waiting_steps == self.status.total_waiting_steps:
-                    self.status.state = self.status.state_after_waiting
-                else:
-                    self.state_waiting_steps += 1
-
-            case ProcessingState.PsuInitProcedure:
+            case ProcessingState.PsuInit:
                 try:
                     self.psu_connect()
                     self.psu_init()
@@ -828,51 +818,9 @@ class RigolTestApp(tk.Tk):
                 else:
                     if not self.config.ssh.enabled or \
                         (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
-                        self.status.state = ProcessingState.PsuPowerOnProcedure
-
-            case ProcessingState.PingProcedure:
-                if not self.ping_procedure():
-                    return
-                if self.config.modbus.automatic_cycle_count_check_enabled:
-                    self.status.state = ProcessingState.ModbusProcedure
-                elif self.config.ssh.enabled:
-                    self.status.state = ProcessingState.SshProcedure
-                elif self.config.connection.psu_enabled:
-                    self.status.state = ProcessingState.PsuPowerOffProcedure
-                else:
-                    self.status.state = ProcessingState.PingProcedure
-
-            case ProcessingState.ModbusProcedure:
-                if not self.modbus_check_procedure():
-                    self.status.state = ProcessingState.Failure
-                    return
-                if self.config.ssh.enabled:
-                    self.status.state = ProcessingState.SshProcedure
-                elif self.config.connection.psu_enabled:
-                    self.status.state = ProcessingState.PsuPowerOffProcedure
-                else:
-                    self.status.state = ProcessingState.ReverseModbusProcedure
-
-            case ProcessingState.ReversePingProcedure:
-                if not self.reverse_ping_procedure():
-                    return
-                self.status.state = ProcessingState.Setup
-
-            case ProcessingState.SshProcedure:
-                if not self.ssh_procedure():
-                    self.status.state = ProcessingState.Failure
-                    return
-                if self.config.modbus.automatic_cycle_count_check_enabled:
-                    self.status.state = ProcessingState.ReverseModbusProcedure
-                else:
-                    self.status.state = ProcessingState.ReversePingProcedure
-
-            case ProcessingState.ReverseModbusProcedure:
-                if not self.reverse_modbus_check_procedure():
-                    return
-                self.status.state = ProcessingState.ReversePingProcedure
+                        self.status.state = ProcessingState.PsuPowerOn
             
-            case ProcessingState.PsuPowerOnProcedure:
+            case ProcessingState.PsuPowerOn:
                 try:
                     self.psu_poweron()
                 except Exception as e:
@@ -880,11 +828,113 @@ class RigolTestApp(tk.Tk):
                     self.status.state = ProcessingState.Failure
                 else:
                     self.log(f"[INFO] PSU is ON")
-                    self.status.state = ProcessingState.Wait
+                    self.status.state = ProcessingState.PingDelay
                     self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
-                    self.status.state_after_waiting = ProcessingState.PingProcedure
+            
+            case ProcessingState.SetupDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.Setup
+                    self.status.waiting_steps = 0
+            
+            case ProcessingState.Setup:
+                self.cycle_defectives.clear()
+                # TODO try to make t0 local
+                self.t0 = None
+                self.cycle_count += 1
+                self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
+                
+                # clear detection times and GUI
+                for ip in self.urls:
+                    self.detection_times[ip] = None
+                    self.gui_queue.put(('update_tree', ip, ""))
+                    self.gui_queue.put(('remove_tag', ip))
+                
+                self.log(f"[INFO] Cycle {self.cycle_count}")
+                if self.config.connection.psu_enabled:
+                    self.status.state = ProcessingState.PsuPowerOn
+                else:
+                    self.status.state = ProcessingState.PingDelay
+            
+            case ProcessingState.PingDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.Ping
+                    self.status.waiting_steps = 0
 
-            case ProcessingState.PsuPowerOffProcedure:
+            case ProcessingState.Ping:
+                if not self.ping_procedure():
+                    return
+                if self.config.modbus.automatic_cycle_count_check_enabled:
+                    self.status.state = ProcessingState.ModbusDelay
+                elif self.config.ssh.enabled:
+                    self.status.state = ProcessingState.SshDelay
+                elif self.config.connection.psu_enabled:
+                    self.status.state = ProcessingState.PsuPowerOffDelay
+                else:
+                    self.status.state = ProcessingState.Setup
+            
+            case ProcessingState.ModbusDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.Modbus
+                    self.status.waiting_steps = 0
+            
+            case ProcessingState.Modbus:
+                if not self.modbus_check_procedure():
+                    self.status.state = ProcessingState.Failure
+                    return
+                if self.config.ssh.enabled:
+                    self.status.state = ProcessingState.SshDelay
+                elif self.config.connection.psu_enabled:
+                    self.status.state = ProcessingState.PsuPowerOffDelay
+                else:
+                    self.status.state = ProcessingState.Setup
+            
+            case ProcessingState.SshDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.Ssh
+                    self.status.waiting_steps = 0
+            
+            case ProcessingState.Ssh:
+                if not self.ssh_procedure():
+                    self.status.state = ProcessingState.Failure
+                    return
+                if self.config.modbus.automatic_cycle_count_check_enabled:
+                    self.status.state = ProcessingState.ReverseModbusDelay
+                else:
+                    self.status.state = ProcessingState.ReversePingDelay
+            
+            case ProcessingState.ReversePingDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.ReversePing
+                    self.status.waiting_steps = 0
+            
+            case ProcessingState.ReversePing:
+                if not self.reverse_ping_procedure():
+                    return
+                self.status.state = ProcessingState.Setup
+            
+            case ProcessingState.ReverseModbusDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.ReverseModbus
+                    self.status.waiting_steps = 0
+            
+            case ProcessingState.ReverseModbus:
+                if not self.reverse_modbus_check_procedure():
+                    return
+                self.status.state = ProcessingState.ReversePingDelay
+            
+            case ProcessingState.PsuPowerOffDelay:
+                self.status.waiting_steps += 1
+                if self.status.waiting_steps == self.status.total_waiting_steps:
+                    self.status.state = ProcessingState.PsuPowerOff
+                    self.status.waiting_steps = 0
+
+            case ProcessingState.PsuPowerOff:
                 try:
                     self.psu_poweroff()
                 except Exception as e:
@@ -892,7 +942,7 @@ class RigolTestApp(tk.Tk):
                     self.status.state = ProcessingState.Failure
                 else:
                     self.log(f"[INFO] PSU is OFF")
-                    self.status.state = ProcessingState.Setup
+                    self.status.state = ProcessingState.SetupDelay
             
             case ProcessingState.Failure:
                 pass
@@ -928,7 +978,13 @@ class RigolTestApp(tk.Tk):
             self.t0 = None
             self.cycle_count += 1
             self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-
+            
+            # clear detection times and GUI
+            for ip in self.urls:
+                self.detection_times[ip] = None
+                self.gui_queue.put(('update_tree', ip, ""))
+                self.gui_queue.put(('remove_tag', ip))
+            
             self.log(f"[INFO] Cycle {self.cycle_count}")
             
             # if the remote PSU is enabled and SSH is disabled, switch on the PSU
@@ -942,12 +998,6 @@ class RigolTestApp(tk.Tk):
                     except Exception as e:
                         self.log(f"[ERRORE] Error while trying to switch on the PSU: {str(e)}")
                         continue
-                        
-            # clear detection times and GUI
-            for ip in self.urls:
-                self.detection_times[ip] = None
-                self.gui_queue.put(('update_tree', ip, ""))
-                self.gui_queue.put(('remove_tag', ip))
             
             # wait for precheck delay
             self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before starting the ping procedure")
