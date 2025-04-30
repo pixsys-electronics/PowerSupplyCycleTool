@@ -10,6 +10,23 @@
 
 **TestbenchManager** handles the testing procedure, the GUI and the logging using python "multithreading".
 
+## Environment
+- Python 3.11.2
+- Linux - Debian 12
+
+## Setup
+```sh
+apt install python3-tk
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Run
+```sh
+python PowerSupplyCycleTool.py
+```
+
 ## State machine
 The workflow for the testing procedure is handled using a state machine. The name of each state of the state machine reflects the type of operation that state will perform.
 There are 10 main states:
@@ -79,19 +96,3 @@ Note: the tool will try to connect to EVERY device under test using the above pa
 **TestbenchManager** picks the URLs to test from the *urls.csv* file, which is also editable from the GUI. Each line must contain a single URL, expect for the first line which is the header of the CSV file.
 
 Note: DO NOT EDIT THE HEADER (the first line of the file)
-
-## Env
-- Python 3.11.2
-
-## Setup (Linux - Debian 12)
-```sh
-apt install python3-tk
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## Run
-```sh
-python PowerSupplyCycleTool.py
-```
