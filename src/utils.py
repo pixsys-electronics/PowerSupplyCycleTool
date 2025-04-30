@@ -1,7 +1,6 @@
 import datetime
 import subprocess
 import concurrent.futures
-from urllib3.exceptions import InsecureRequestWarning
 import csv
 import os
 from ipaddress import IPv4Address

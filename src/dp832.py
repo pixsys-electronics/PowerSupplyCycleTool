@@ -1,13 +1,5 @@
 import pyvisa as visa
-#import visa
 import time
-import os
-import json
-import netifaces as ni
-import socket
-import netaddr
-import datetime
-import logging
 
 _delay = 0.1  # in seconds
 
