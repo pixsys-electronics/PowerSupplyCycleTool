@@ -213,8 +213,8 @@ class TestbenchApp(tk.Tk):
         self.frames.psu_frame.set_psu_ip(self.config.connection.psu_address)
         self.frames.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
         self.frames.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
-        self.frames.psu_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
-        self.frames.psu_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
+        self.frames.psu_frame.set_force_on_button_press_cb(self.on_psu_force_power_on)
+        self.frames.psu_frame.set_force_off_button_press_cb(self.on_psu_force_power_off)
         
         self.frames.timing_frame.set_precheck(self.config.timing.pre_check_delay)
         self.frames.timing_frame.set_checkloop(self.config.timing.loop_check_period)
@@ -286,6 +286,27 @@ class TestbenchApp(tk.Tk):
     def on_psu_ip_change(self, value: str):
         self.config.connection.psu_address = value
         self.save_config_debounced()
+    
+    def on_psu_force_power_on(self):
+        """Forza manualmente l'accensione dell'alimentatore."""
+        try:
+            self.log_info(f"Connessione all'alimentatore {self.config.connection.psu_address}...")
+            self.psu_connect()
+            self.psu_init()
+            self.psu_poweron()
+            self.log_info("Alimentatore forzato su ON.")
+        except Exception as e:
+            self.log_error(f"Errore durante l'accensione forzata: {str(e)}")
+
+    def on_psu_force_power_off(self):
+        """Forza manualmente lo spegnimento dell'alimentatore."""
+        try:
+            self.log_info(f"Connessione all'alimentatore {self.config.connection.psu_address}...")
+            self.psu_connect()
+            self.psu_poweroff()
+            self.log_info("Alimentatore forzato su OFF.")
+        except Exception as e:
+            self.log_error(f"Errore durante lo spegnimento forzato: {str(e)}")
     
     def on_timing_precheck_change(self, value: float):
         self.config.timing.pre_check_delay = value
@@ -441,27 +462,6 @@ class TestbenchApp(tk.Tk):
             self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
             self.frames.manual_controls_frame.set_pause_button_text("Pausa")
             self.log_info("Test ripreso.")
-
-    def on_commands_force_power_on(self):
-        """Forza manualmente l'accensione dell'alimentatore."""
-        try:
-            self.log_info(f"Connessione all'alimentatore {self.config.connection.psu_address}...")
-            self.psu_connect()
-            self.psu_init()
-            self.psu_poweron()
-            self.log_info("Alimentatore forzato su ON.")
-        except Exception as e:
-            self.log_error(f"Errore durante l'accensione forzata: {str(e)}")
-
-    def on_commands_force_power_off(self):
-        """Forza manualmente lo spegnimento dell'alimentatore."""
-        try:
-            self.log_info(f"Connessione all'alimentatore {self.config.connection.psu_address}...")
-            self.psu_connect()
-            self.psu_poweroff()
-            self.log_info("Alimentatore forzato su OFF.")
-        except Exception as e:
-            self.log_error(f"Errore durante lo spegnimento forzato: {str(e)}")
     
     def on_file_apply_press(self):
         content = self.frames.file_frame.get_text()
