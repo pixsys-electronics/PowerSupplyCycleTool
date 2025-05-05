@@ -629,6 +629,7 @@ class LogFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
         
         self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
         self.log_text.grid(row=0, column=0, sticky="nsew")
@@ -637,6 +638,9 @@ class LogFrame(tk.LabelFrame):
         self.log_text.tag_configure(LogType.Info.value, foreground="black")
         self.log_text.tag_configure(LogType.Timestamp.value, foreground="blue")
         self.log_text.config(state=tk.DISABLED)
+        
+        clear_button = ttk.Button(self, text="Clear", command=self.on_clear_button_press)
+        clear_button.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def add_log(self, msg: str, type: LogType, timestamp: Optional[datetime.datetime]):
         self.log_text.config(state=tk.NORMAL)
@@ -649,3 +653,8 @@ class LogFrame(tk.LabelFrame):
     
     def scroll_down(self):
         self.log_text.see(tk.END)
+    
+    def on_clear_button_press(self):
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.delete("1.0", tk.END)
+        self.log_text.config(state=tk.DISABLED)
