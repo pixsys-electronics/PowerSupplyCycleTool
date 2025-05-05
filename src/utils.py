@@ -42,7 +42,9 @@ def run_ssh_command(server: IPv4Address, username: str, password: str, command: 
     ssh = SSHClient()
     ssh.set_missing_host_key_policy(AutoAddPolicy())
     ssh.connect(str(server), username=username, password=password)
-    _, _, _ = ssh.exec_command(command)
+    _, stdout, stderr = ssh.exec_command(command)
+    _ = stdout.read()
+    _ = stderr.read()
     ssh.close()
 
 def run_modbus_read_registers(host: IPv4Address, reg_addr: int, reg_num: int, timeout: float):
