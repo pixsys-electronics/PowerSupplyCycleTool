@@ -577,12 +577,9 @@ class TestbenchApp(tk.Tk):
         for url,future in url_futures.items():
             try:
                 response = future.result()
-            except subprocess.TimeoutExpired:
+            except Exception as e:
                 response = None
-                self.log_error(f"{url} non ha risposto al ping")
-            except Exception as exc:
-                response = None
-                self.log_error(f"Verifica IP {url} ha generato un'eccezione: {exc}")
+                self.log_error(f"Exception: {e}")
         
             detection_times[url] = response
         
@@ -685,7 +682,8 @@ class TestbenchApp(tk.Tk):
             try:
                 _ = future.result()
                 cycle_count_success = False
-                break     
+                self.log_warn(f"{str(ip)} answered to MODBUS")
+                break
             except Exception as e:
                 pass
         
