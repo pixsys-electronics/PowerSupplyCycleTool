@@ -4,13 +4,14 @@ import time
 import datetime
 import queue
 import subprocess
+from typing import Tuple
 from urllib3.exceptions import InsecureRequestWarning
 import requests
 import os
 import json
 from ordered_set import OrderedSet
 from config import TestBenchConfig
-from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
+from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, LogType, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
 from enum import Enum
 from dp832 import dp832
 from utils import broadcast_modbus_read_poweron_counter, broadcast_modbus_read_register, broadcast_modbus_write_poweron_counter, broadcast_modbus_write_register, broadcast_modbus_write_time_counter, broadcast_ping, broadcast_ssh_command, get_current_git_commit_hash, ip_from_url, url_list_from_csv
@@ -127,7 +128,7 @@ class TestbenchApp(tk.Tk):
         self.t0: datetime.datetime | None = None
         
         # Code per log e comunicazioni verso la GUI
-        self.log_queue = queue.Queue()
+        self.log_queue: queue.Queue[Tuple[str, datetime.datetime, LogType]] = queue.Queue()
         self.gui_queue = queue.Queue()
         
         # Controllo del loop di test
@@ -150,8 +151,8 @@ class TestbenchApp(tk.Tk):
         self.create_widgets()
         
         # Gestione code
-        self.after(self.log_queue_processing_period * 1000, self.process_log_queue)
-        self.after(self.gui_queue_processing_period * 1000, self.process_gui_queue)
+        self.after(int(self.log_queue_processing_period * 1000), self.process_log_queue)
+        self.after(int(self.gui_queue_processing_period * 1000), self.process_gui_queue)
         
         self.save_config_debouncer = Debouncer(self, self.save_config_debouncing_timeout * 1000, self.save_config)
         
@@ -327,13 +328,13 @@ class TestbenchApp(tk.Tk):
                 try:
                     regs = future.result()
                     if regs is None or len(regs) == 0:
-                        self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                        self.log_error(f"{str(ip)} invalid answer to MODBUS request")
                         continue
                     value = regs[0]
-                    self.log(f"[INFO] {str(ip)} address {self.config.modbus.register_address} value {value}")
+                    self.log_info(f"{str(ip)} address {self.config.modbus.register_address} value {value}")
                     
                 except Exception as e:
-                    self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                    self.log_error(f"{str(ip)} did not answered to MODBUS request: {e}")
 
     def on_modbus_write_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
@@ -343,12 +344,12 @@ class TestbenchApp(tk.Tk):
             try:
                 ok = future.result()
                 if not ok:
-                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    self.log_error(f"{str(ip)} invalid answer to MODBUS request")
                     continue
                 
-                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+                self.log_info(f"{str(ip)} succesfully answered to MODBUS request")
             except Exception as e:
-                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                self.log_error(f"{str(ip)} did not answered to MODBUS request: {e}")
 
     def on_modbus_reset_cycle_count_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
@@ -358,12 +359,12 @@ class TestbenchApp(tk.Tk):
             try:
                 ok = future.result()
                 if not ok:
-                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    self.log_error(f"{str(ip)} invalid answer to MODBUS request")
                     continue
                 
-                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+                self.log_info(f"{str(ip)} succesfully answered to MODBUS request")
             except Exception as e:
-                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                self.log_error(f"{str(ip)} did not answered to MODBUS request: {e}")
 
     def on_modbus_reset_time_count_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
@@ -373,12 +374,12 @@ class TestbenchApp(tk.Tk):
             try:
                 ok = future.result()
                 if not ok:
-                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    self.log_error(f"{str(ip)} invalid answer to MODBUS request")
                     continue
                 
-                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+                self.log_info(f"{str(ip)} succesfully answered to MODBUS request")
             except Exception as e:
-                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                self.log_error(f"{str(ip)} did not answered to MODBUS request: {e}")
 
             
     def on_commands_start_test(self):
@@ -389,7 +390,7 @@ class TestbenchApp(tk.Tk):
         self.is_paused = False
         self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
         self.frames.manual_controls_frame.set_pause_button_text("Pausa")
-        self.log("[INFO] Test avviato.")
+        self.log_info("Test avviato.")
         self.test_start_time = time.time()
         self.update_elapsed_time()
         self.test_stopped_intentionally = False
@@ -404,7 +405,7 @@ class TestbenchApp(tk.Tk):
         if self.report_filepath:
             self.write_test_start_line()
         else:
-            self.log("[ERRORE] Non è stato possibile creare il file di report. Il test continuerà senza logging.")
+            self.log_error("Non è stato possibile creare il file di report. Il test continuerà senza logging.")
         self.status = ProcessingStatus()
         test_thread = threading.Thread(target=self.state_machine_thread, daemon=True)
         test_thread.start()
@@ -416,45 +417,45 @@ class TestbenchApp(tk.Tk):
                 continue
             self.test_step(self.state_machine_dt)
         
-        self.log("[INFO] Test loop has been stopped")
+        self.log_info("Test loop has been stopped")
     
     def on_commands_stop_test(self):
         """Ferma il test in modo pulito."""
         self.run_test = False
         self.test_stopped_intentionally = True
-        self.log("[INFO] Richiesto stop del test.")
+        self.log_info("Richiesto stop del test.")
     
     def on_commands_toggle_pause(self):
         self.is_paused = not self.is_paused
         if self.is_paused:
             self.frames.manual_controls_frame.set_pause_status_label("Stato: In Pausa")
             self.frames.manual_controls_frame.set_pause_button_text("Riprendi")
-            self.log("[INFO] Test in pausa.")
+            self.log_info("Test in pausa.")
         else:
             self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
             self.frames.manual_controls_frame.set_pause_button_text("Pausa")
-            self.log("[INFO] Test ripreso.")
+            self.log_info("Test ripreso.")
 
     def on_commands_force_power_on(self):
         """Forza manualmente l'accensione dell'alimentatore."""
         try:
-            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            self.log_info(f"Connessione all'alimentatore {self.config.connection.psu_address}...")
             self.psu_connect()
             self.psu_init()
             self.psu_poweron()
-            self.log("[INFO] Alimentatore forzato su ON.")
+            self.log_info("Alimentatore forzato su ON.")
         except Exception as e:
-            self.log(f"[ERRORE] Errore durante l'accensione forzata: {str(e)}")
+            self.log_error(f"Errore durante l'accensione forzata: {str(e)}")
 
     def on_commands_force_power_off(self):
         """Forza manualmente lo spegnimento dell'alimentatore."""
         try:
-            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
+            self.log_info(f"Connessione all'alimentatore {self.config.connection.psu_address}...")
             self.psu_connect()
             self.psu_poweroff()
-            self.log("[INFO] Alimentatore forzato su OFF.")
+            self.log_info("Alimentatore forzato su OFF.")
         except Exception as e:
-            self.log(f"[ERRORE] Errore durante lo spegnimento forzato: {str(e)}")
+            self.log_error(f"Errore durante lo spegnimento forzato: {str(e)}")
     
     def on_file_apply_press(self):
         content = self.frames.file_frame.get_text()
@@ -489,23 +490,32 @@ class TestbenchApp(tk.Tk):
         for ip in self.urls:
             self.detection_times[ip] = None
             self.frames.ip_frame.tree_insert(ip, (ip, ""), ('normal',))
-            self.log(f"[INFO] URL found: {ip}")
+            self.log_info(f"URL found: {ip}")
+    
+    def log(self, msg: str, type: LogType):
+        now = datetime.datetime.now()
+        self.log_queue.put((msg, now, type))
         
-    def log(self, message):
-        """Aggiunge un messaggio alla coda di log."""
-        self.log_queue.put(message)
-
+    def log_info(self, msg: str):
+        self.log(msg, LogType.Info)
+    
+    def log_warn(self, msg: str):
+        self.log(msg, LogType.Warn)
+    
+    def log_error(self, msg: str):
+        self.log(msg, LogType.Error)
+    
     def process_log_queue(self):
         """Aggiorna l'area log con i messaggi in coda."""
         while True:
             try:
-                msg = self.log_queue.get_nowait()
+                msg, now, type = self.log_queue.get_nowait()
             except queue.Empty:
                 break
             else:
-                self.frames.log_frame.add_log(msg)
+                self.frames.log_frame.add_log(msg, type, now)
                 self.frames.log_frame.scroll_down()
-        self.after(self.log_queue_processing_period * 1000, self.process_log_queue)
+        self.after(int(self.log_queue_processing_period * 1000), self.process_log_queue)
 
     def process_gui_queue(self):
         """Gestisce gli aggiornamenti della GUI dalla coda."""
@@ -530,8 +540,8 @@ class TestbenchApp(tk.Tk):
             except queue.Empty:
                 break
             except Exception as e:
-                self.log(f"[ERRORE] Errore in process_gui_queue: {str(e)}")
-        self.after(self.gui_queue_processing_period * 1000, self.process_gui_queue)
+                self.log_error(f"Errore in process_gui_queue: {str(e)}")
+        self.after(int(self.gui_queue_processing_period * 1000), self.process_gui_queue)
 
     def make_report_filename(self):
         """Genera un nome file per il report basato sulla data e ora corrente."""
@@ -542,7 +552,7 @@ class TestbenchApp(tk.Tk):
     def write_test_start_line(self):
         """Scrive una riga di intestazione nel file di report per l'inizio del test."""
         if not self.report_filepath:
-            self.log("[ERRORE] Nome del file di report non definito.")
+            self.log_error("Nome del file di report non definito.")
             return
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         line = f"### Test started at {start_time_str}\n"
@@ -550,7 +560,7 @@ class TestbenchApp(tk.Tk):
             with open(self.report_filepath, "a", encoding="utf-8") as f:
                 f.write(line)
         except Exception as e:
-            self.log(f"[ERRORE] Errore durante la scrittura del file di report: {str(e)}")
+            self.log_error(f"Errore durante la scrittura del file di report: {str(e)}")
     
     def ping_with_detection_time(self, url_list: list[str]) -> dict[str, (datetime.datetime | None)]:
         detection_times: dict[str, (datetime.datetime | None)] = dict()
@@ -563,10 +573,10 @@ class TestbenchApp(tk.Tk):
                 response = future.result()
             except subprocess.TimeoutExpired:
                 response = None
-                self.log(f"[ERRORE] {url} non ha risposto al ping")
+                self.log_error(f"{url} non ha risposto al ping")
             except Exception as exc:
                 response = None
-                self.log(f"[ERRORE] Verifica IP {url} ha generato un'eccezione: {exc}")
+                self.log_error(f"Verifica IP {url} ha generato un'eccezione: {exc}")
         
             detection_times[url] = response
         
@@ -589,11 +599,11 @@ class TestbenchApp(tk.Tk):
             self.detection_times[url] = detection_time
             detected_time_str = self.detection_times[url].strftime("%H:%M:%S.%f")[:-3]
             self.gui_queue.put(('update_tree', url, detected_time_str))
-            self.log(f"[INFO] IP {url} rilevato alle {detected_time_str}")
+            self.log_info(f"IP {url} rilevato alle {detected_time_str}")
             elapsed_since_t0 = (self.detection_times[url] - self.t0).total_seconds()
             # if the time difference is greater than the max startup delay, flag it as anomaly
             if elapsed_since_t0 > self.config.timing.max_startup_delay and url not in self.cycle_defectives:
-                self.log(f"[ALLARME] IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
+                self.log_warn(f"IP {url} rilevato con ritardo di {elapsed_since_t0:.3f} secondi.")
                 self.cycle_defectives.add(url)
         
         # if every URL has answered, generate the report file and exit
@@ -608,7 +618,7 @@ class TestbenchApp(tk.Tk):
         # finally check who didn't responded yet
         non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
         for ip in non_rilevati:
-            self.log(f"[ALLARME] IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
+            self.log_warn(f"IP {ip} non ha risposto entro {self.config.timing.max_startup_delay} secondi.")
             self.gui_queue.put(('highlight_error', ip))
             self.cycle_defectives.add(ip)
         
@@ -625,7 +635,7 @@ class TestbenchApp(tk.Tk):
         for url,detection_time in detection_times_valid.items():
             self.detection_times[url] = detection_time
             self.gui_queue.put(('update_tree', url, ""))
-            self.log(f"[INFO] URL {url} stopped answering")
+            self.log_info(f"URL {url} stopped answering")
         
         if all(self.detection_times[ip] is None for ip in self.urls):
             return True
@@ -642,19 +652,19 @@ class TestbenchApp(tk.Tk):
             try:
                 regs = future.result()
                 if regs is None:
-                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    self.log_error(f"{str(ip)} invalid answer to MODBUS request")
                     cycle_count_failure = True
                     break
                 counter = regs[0]
                 if counter != self.cycle_count:
-                    self.log(f"[ERROR] {str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
+                    self.log_error(f"{str(ip)} has a cycle count of {counter} while the current cycle count is {self.cycle_count}")
                     cycle_count_failure = True
                     break
 
-                self.log(f"[INFO] {str(ip)} cycle count is up-to-date")
+                self.log_info(f"{str(ip)} cycle count is up-to-date")
                 
             except Exception as e:
-                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
+                self.log_error(f"{str(ip)} did not answered to MODBUS request: {e}")
                 cycle_count_failure = True
                 break
         
@@ -683,9 +693,9 @@ class TestbenchApp(tk.Tk):
         for ip,future in futures_dict.items():
             try:
                 future.result()
-                self.log(f"[INFO] SSH command succesfully sent to {str(ip)}")
+                self.log_info(f"SSH command succesfully sent to {str(ip)}")
             except Exception as e:
-                self.log(f"[ERROR] {e}")
+                self.log_error(f"{e}")
                 ssh_failure = True
                 break
         
@@ -734,10 +744,10 @@ class TestbenchApp(tk.Tk):
                     self.psu_connect()
                     self.psu_init()
                 except Exception as e:
-                    self.log(f"[ERRORE] Connection to PSU failed: {str(e)}")
+                    self.log_error(f"Connection to PSU failed: {str(e)}")
                     self.status.state = ProcessingState.Failure
                 else:
-                    self.log(f"[INFO] Connected to remote PSU")
+                    self.log_info(f"Connected to remote PSU")
                     if not self.config.ssh.enabled or \
                         (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
                         self.status.state = ProcessingState.PsuPowerOn
@@ -746,13 +756,13 @@ class TestbenchApp(tk.Tk):
                 try:
                     self.psu_poweron()
                 except Exception as e:
-                    self.log(f"[ERRORE] Error while trying to switch on the PSU: {str(e)}")
+                    self.log_error(f"Error while trying to switch on the PSU: {str(e)}")
                     self.status.state = ProcessingState.Failure
                 else:
                     self.status.state = ProcessingState.PingDelay
                     self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
-                    self.log(f"[INFO] PSU is ON")
-                    self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before the ping procedure")
+                    self.log_info(f"PSU is ON")
+                    self.log_info(f"Waiting {self.config.timing.pre_check_delay}s before the ping procedure")
             
             case ProcessingState.SetupDelay:
                 self.try_state_transition(ProcessingState.Setup)
@@ -770,23 +780,23 @@ class TestbenchApp(tk.Tk):
                     self.gui_queue.put(('update_tree', ip, ""))
                     self.gui_queue.put(('remove_tag', ip))
                 
-                self.log(f"[INFO] Cycle {self.cycle_count}")
+                self.log_info(f"Cycle {self.cycle_count}")
                 if self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOn
                 else:                    
                     self.status.state = ProcessingState.PingDelay
                     self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
-                    self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before the ping procedure")
+                    self.log_info(f"Waiting {self.config.timing.pre_check_delay}s before the ping procedure")
             
             case ProcessingState.PingDelay:
                 if self.try_state_transition(ProcessingState.Ping):
-                    self.log(f"[INFO] Ping procedure started")
+                    self.log_info(f"Ping procedure started")
 
             case ProcessingState.Ping:
                 if not self.ping_procedure():
                     return
                 
-                self.log(f"[INFO] Ping procedure succesfully finished")
+                self.log_info(f"Ping procedure succesfully finished")
                 # update the anomaly count using the size of the cycle_defectives set
                 self.anomaly_count += len(self.cycle_defectives)
                 self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
@@ -794,17 +804,17 @@ class TestbenchApp(tk.Tk):
                 if self.config.modbus.automatic_cycle_count_check_enabled:
                     self.status.state = ProcessingState.ModbusDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the MODBUS procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the MODBUS procedure")
                 
                 elif self.config.ssh.enabled:
                     self.status.state = ProcessingState.SshDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the SSH procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the SSH procedure")
                 
                 elif self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOffDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the PSI power-off procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the PSI power-off procedure")
                 else:
                     self.status.state = ProcessingState.Setup
             
@@ -814,17 +824,17 @@ class TestbenchApp(tk.Tk):
             case ProcessingState.Modbus:
                 if not self.modbus_check_procedure():
                     self.status.state = ProcessingState.Failure
-                    self.log(f"[ERROR] MODBUS procedure failed")
+                    self.log_error(f"MODBUS procedure failed")
                     return
-                self.log(f"[INFO] MODBUS procedure succesfully finished")
+                self.log_info(f"MODBUS procedure succesfully finished")
                 if self.config.ssh.enabled:
                     self.status.state = ProcessingState.SshDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the SSH procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the SSH procedure")
                 elif self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOffDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the power-off procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the power-off procedure")
                 else:
                     self.status.state = ProcessingState.Setup
             
@@ -834,36 +844,36 @@ class TestbenchApp(tk.Tk):
             case ProcessingState.Ssh:
                 if not self.ssh_procedure():
                     self.status.state = ProcessingState.Failure
-                    self.log(f"[ERROR] SSH procedure failed")
+                    self.log_error(f"SSH procedure failed")
                     return
-                self.log(f"[INFO] SSH procedure succesfully finished")
+                self.log_info(f"SSH procedure succesfully finished")
                 if self.config.modbus.automatic_cycle_count_check_enabled:
                     self.status.state = ProcessingState.ReverseModbusDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the reverse MODBUS procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the reverse MODBUS procedure")
                 else:
                     self.status.state = ProcessingState.ReversePingDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
-                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the reverse ping procedure")
+                    self.log_info(f"Waiting {self.default_waiting_time}s before the reverse ping procedure")
             
             case ProcessingState.ReversePingDelay:
                 if self.try_state_transition(ProcessingState.ReversePing):
-                    self.log(f"[INFO] Reverse ping procedure started")
+                    self.log_info(f"Reverse ping procedure started")
             
             case ProcessingState.ReversePing:
                 if not self.reverse_ping_procedure():
                     return
-                self.log(f"[INFO] Reverse ping procedure succesfully finished")
+                self.log_info(f"Reverse ping procedure succesfully finished")
                 self.status.state = ProcessingState.Setup
             
             case ProcessingState.ReverseModbusDelay:
                 if self.try_state_transition(ProcessingState.ReverseModbus):
-                    self.log(f"[INFO] Reverse MODBUS procedure started")
+                    self.log_info(f"Reverse MODBUS procedure started")
             
             case ProcessingState.ReverseModbus:
                 if not self.reverse_modbus_check_procedure():
                     return
-                self.log(f"[INFO] Reverse MODBUS succesfully finished")
+                self.log_info(f"Reverse MODBUS succesfully finished")
                 self.status.state = ProcessingState.ReversePingDelay
                 self.status.total_waiting_steps = int(self.default_waiting_time / dt)
             
@@ -874,12 +884,12 @@ class TestbenchApp(tk.Tk):
                 try:
                     self.psu_poweroff()
                 except Exception as e:
-                    self.log(f"[ERRORE] Error while trying to switch off the PSU: {str(e)}")
+                    self.log_error(f"Error while trying to switch off the PSU: {str(e)}")
                     self.status.state = ProcessingState.Failure
                 else:
-                    self.log(f"[INFO] PSU is OFF")
+                    self.log_info(f"PSU is OFF")
                     self.status.state = ProcessingState.SetupDelay
-                    self.log(f"[INFO] Waiting {self.config.timing.poweroff_delay}s before starting the next iteration")
+                    self.log_info(f"Waiting {self.config.timing.poweroff_delay}s before starting the next iteration")
                     self.status.total_waiting_steps = int(self.config.timing.poweroff_delay / dt)
             
             case ProcessingState.Failure:
@@ -894,7 +904,7 @@ class TestbenchApp(tk.Tk):
         - Ritardo tra il primo e l'ultimo
         """
         if not self.report_filepath:
-            self.log("[ERRORE] Nome del file di report non definito. Impossibile salvare il ciclo.")
+            self.log_error("Nome del file di report non definito. Impossibile salvare il ciclo.")
             return
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cycle_str = f"{self.cycle_count:5d}"
@@ -903,7 +913,7 @@ class TestbenchApp(tk.Tk):
             with open(self.report_filepath, "a", encoding="utf-8") as f:
                 f.write(line)
         except Exception as e:
-            self.log(f"[ERRORE] Errore durante la scrittura del ciclo nel report: {str(e)}")
+            self.log_error(f"Errore durante la scrittura del ciclo nel report: {str(e)}")
 
 
     def update_elapsed_time(self):
@@ -914,7 +924,7 @@ class TestbenchApp(tk.Tk):
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             self.frames.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
-            self.after(self.timer_processing_period * 1000, self.update_elapsed_time)
+            self.after(int(self.timer_processing_period * 1000), self.update_elapsed_time)
     
 # Avvio dell'applicazione
 if __name__ == "__main__":

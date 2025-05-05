@@ -1,6 +1,8 @@
+import datetime
+from enum import Enum
 import tkinter as tk
 from tkinter import ttk, scrolledtext
-from typing import Callable
+from typing import Callable, Optional
 
 class ModbusFrame(tk.LabelFrame):
     modbus_enable_automatic_cycle_count_var: tk.IntVar
@@ -556,19 +558,34 @@ class FileFrame(tk.LabelFrame):
     def get_text(self):
         return self.file.get("1.0", "end-1c")
 
+class LogType(Enum):
+    Error = "error"
+    Warn = "warning"
+    Info = "info"
+
 class LogFrame(tk.LabelFrame):
     log_text: scrolledtext.ScrolledText
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Log")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
-        
         self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=65)
         self.log_text.grid(row=0, column=0, sticky="nsew")
         self.log_text.config(height=23)
+        self.log_text.tag_configure(LogType.Error.value, foreground="red")
+        self.log_text.tag_configure(LogType.Warn.value, foreground="orange")
+        self.log_text.tag_configure(LogType.Info.value, foreground="black")
+        self.log_text.config(state=tk.DISABLED)
     
-    def add_log(self, msg: str):
-        self.log_text.insert(tk.END, msg + "\n")
+    def add_log(self, msg: str, type: LogType, timestamp: Optional[datetime.datetime]):
+        message = ""
+        if timestamp is not None:
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            message += f"[{now_str}]"
+        message += f"{msg}\n"
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.insert(tk.END, message, type.value)
+        self.log_text.config(state=tk.DISABLED)
     
     def scroll_down(self):
         self.log_text.see(tk.END)
