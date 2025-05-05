@@ -102,8 +102,8 @@ class TestbenchApp(tk.Tk):
     window_h = 800
     save_config_debouncer: Debouncer
     status: ProcessingStatus
-    modbus_timeout: float = 5
-    ping_timeout: float = 3
+    modbus_timeout: float = 1
+    ping_timeout: float = 2
     state_machine_dt = 0.5
     default_waiting_time = 5
     log_queue_processing_period = 0.1
