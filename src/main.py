@@ -105,6 +105,10 @@ class TestbenchApp(tk.Tk):
     ping_timeout: float = 3
     state_machine_dt = 0.5
     default_waiting_time = 5
+    log_queue_processing_period = 0.1
+    gui_queue_processing_period = 0.5
+    timer_processing_period = 1
+    save_config_debouncing_timeout = 1
     frames: TestbenchFrames
 
     def __init__(self, version):
@@ -146,10 +150,10 @@ class TestbenchApp(tk.Tk):
         self.create_widgets()
         
         # Gestione code
-        self.after(500, self.process_log_queue)
-        self.after(100, self.process_gui_queue)
+        self.after(self.log_queue_processing_period * 1000, self.process_log_queue)
+        self.after(self.gui_queue_processing_period * 1000, self.process_gui_queue)
         
-        self.save_config_debouncer = Debouncer(self, 500, self.save_config)
+        self.save_config_debouncer = Debouncer(self, self.save_config_debouncing_timeout * 1000, self.save_config)
         
         self.status = ProcessingStatus()
 
@@ -501,7 +505,7 @@ class TestbenchApp(tk.Tk):
             else:
                 self.frames.log_frame.add_log(msg)
                 self.frames.log_frame.scroll_down()
-        self.after(500, self.process_log_queue)
+        self.after(self.log_queue_processing_period * 1000, self.process_log_queue)
 
     def process_gui_queue(self):
         """Gestisce gli aggiornamenti della GUI dalla coda."""
@@ -527,7 +531,7 @@ class TestbenchApp(tk.Tk):
                 break
             except Exception as e:
                 self.log(f"[ERRORE] Errore in process_gui_queue: {str(e)}")
-        self.after(100, self.process_gui_queue)
+        self.after(self.gui_queue_processing_period * 1000, self.process_gui_queue)
 
     def make_report_filename(self):
         """Genera un nome file per il report basato sulla data e ora corrente."""
@@ -630,7 +634,6 @@ class TestbenchApp(tk.Tk):
     
     # returns True if the modbus procedure has succesfully finished, otherwise False
     def modbus_check_procedure(self) -> bool:
-        self.log(f"[INFO] MODBUS procedure started")
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)
@@ -655,12 +658,6 @@ class TestbenchApp(tk.Tk):
                 cycle_count_failure = True
                 break
         
-        # if something went wrong during the cycle count check, byee
-        if cycle_count_failure:
-            self.log("[INFO] MODBUS procedure failed")
-        else:
-            self.log("[INFO] MODBUS procedure succesfully finished")
-
         return not cycle_count_failure
 
     def reverse_modbus_check_procedure(self) -> bool:
@@ -679,7 +676,6 @@ class TestbenchApp(tk.Tk):
         return cycle_count_success
     
     def ssh_procedure(self) -> bool:
-        self.log("[INFO] SSH procedure started")
         ssh_failure = False
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
@@ -693,11 +689,6 @@ class TestbenchApp(tk.Tk):
                 ssh_failure = True
                 break
         
-        if ssh_failure:
-            self.log("[INFO] SSH procedure failed")
-        else:        
-            self.log("[INFO] SSH procedure succesfully finished")
-
         return not ssh_failure
     
     def psu_connect(self):
@@ -746,7 +737,7 @@ class TestbenchApp(tk.Tk):
                     self.log(f"[ERRORE] Connection to PSU failed: {str(e)}")
                     self.status.state = ProcessingState.Failure
                 else:
-                    self.log(f"[ERRORE] Connected to remote PSU")
+                    self.log(f"[INFO] Connected to remote PSU")
                     if not self.config.ssh.enabled or \
                         (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
                         self.status.state = ProcessingState.PsuPowerOn
@@ -923,35 +914,8 @@ class TestbenchApp(tk.Tk):
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             self.frames.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
-            self.after(1000, self.update_elapsed_time)
+            self.after(self.timer_processing_period * 1000, self.update_elapsed_time)
     
-    def reset_cycle_count(self):
-        self.cycle_count = 0
-        self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-        ip_list = [ip_from_url(url) for url in self.urls]
-        ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_write_poweron_counter(ip_list, 0, self.modbus_timeout)
-        for ip,future in futures_dict.items():
-            try:
-                ok = future.result()
-                if not ok:
-                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
-                    continue
-                
-                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
-            except Exception as e:
-                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
-
-
-    def wait_with_stop_check(self, seconds):
-        """Esegue attese a piccoli step verificando se il test è ancora attivo."""
-        steps = int(seconds / self.config.timing.loop_check_period)
-        for _ in range(steps):
-            if not self.run_test:
-                return False
-            time.sleep(self.config.timing.loop_check_period)
-        return True
-
 # Avvio dell'applicazione
 if __name__ == "__main__":
     version =  get_current_git_commit_hash()
