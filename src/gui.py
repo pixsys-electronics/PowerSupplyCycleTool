@@ -585,7 +585,7 @@ class FileFrame(tk.LabelFrame):
         super().__init__(parent, text="File")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=15)
         self.grid_rowconfigure(1, weight=1)
         
         self.file = scrolledtext.ScrolledText(self)
@@ -631,7 +631,7 @@ class LogFrame(tk.LabelFrame):
         self.paused = False
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=15)
         self.grid_rowconfigure(1, weight=1)
         
         self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
