@@ -623,9 +623,12 @@ class LogType(Enum):
 
 class LogFrame(tk.LabelFrame):
     log_text: scrolledtext.ScrolledText
+    pause_button: ttk.Button
+    paused: bool
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Log")
+        self.paused = False
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -639,8 +642,14 @@ class LogFrame(tk.LabelFrame):
         self.log_text.tag_configure(LogType.Timestamp.value, foreground="blue")
         self.log_text.config(state=tk.DISABLED)
         
-        clear_button = ttk.Button(self, text="Clear", command=self.on_clear_button_press)
-        clear_button.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+        buttons_frame = tk.Frame(self)
+        buttons_frame.grid(row=1, column=0, sticky="nsew")
+        
+        clear_button = ttk.Button(buttons_frame, text="Clear", command=self.on_clear_button_press)
+        clear_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+        
+        self.pause_button = ttk.Button(buttons_frame, text="Pause", command=self.on_pause_button_press)
+        self.pause_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def add_log(self, msg: str, type: LogType, timestamp: Optional[datetime.datetime]):
         self.log_text.config(state=tk.NORMAL)
@@ -650,6 +659,9 @@ class LogFrame(tk.LabelFrame):
             self.log_text.insert(tk.END, now_str, LogType.Timestamp.value)
         self.log_text.insert(tk.END, f"{msg}\n", type.value)
         self.log_text.config(state=tk.DISABLED)
+        
+        if not self.paused:
+            self.scroll_down()
     
     def scroll_down(self):
         self.log_text.see(tk.END)
@@ -658,3 +670,10 @@ class LogFrame(tk.LabelFrame):
         self.log_text.config(state=tk.NORMAL)
         self.log_text.delete("1.0", tk.END)
         self.log_text.config(state=tk.DISABLED)
+    
+    def on_pause_button_press(self):
+        self.paused = not self.paused
+        if self.paused:
+            self.pause_button.configure(text="Resume")
+        else:
+            self.pause_button.configure(text="Pause")

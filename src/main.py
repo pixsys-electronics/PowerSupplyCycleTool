@@ -512,7 +512,6 @@ class TestbenchApp(tk.Tk):
                 break
             else:
                 self.frames.log_frame.add_log(msg, type, now)
-                self.frames.log_frame.scroll_down()
         self.after(int(self.log_queue_processing_period * 1000), self.process_log_queue)
 
     def process_gui_queue(self):
