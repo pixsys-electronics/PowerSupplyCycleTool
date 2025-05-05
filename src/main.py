@@ -13,7 +13,7 @@ from config import TestBenchConfig
 from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
 from enum import Enum
 from dp832 import dp832
-from utils import broadcast_modbus_read_poweron_counter, broadcast_modbus_read_register, broadcast_modbus_write_poweron_counter, broadcast_modbus_write_register, broadcast_ping, broadcast_ssh_command, get_current_git_commit_hash, ip_from_url, url_list_from_csv
+from utils import broadcast_modbus_read_poweron_counter, broadcast_modbus_read_register, broadcast_modbus_write_poweron_counter, broadcast_modbus_write_register, broadcast_modbus_write_time_counter, broadcast_ping, broadcast_ssh_command, get_current_git_commit_hash, ip_from_url, url_list_from_csv
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -313,11 +313,12 @@ class TestbenchApp(tk.Tk):
     def on_modbus_register_value_change(self, value: int):
         self.config.modbus.register_value = value
         self.save_config_debounced()
-
+        
+    # TODO try to group these on_modbus functions inside a single on instead of copy-pasting
     def on_modbus_read_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_read_register(ip_list, self.config.modbus.register_address, 1)
+        futures_dict = broadcast_modbus_read_register(ip_list, self.config.modbus.register_address, 1, self.modbus_timeout)
         for ip,future in futures_dict.items():
                 try:
                     regs = future.result()
@@ -333,7 +334,7 @@ class TestbenchApp(tk.Tk):
     def on_modbus_write_press(self):
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
-        futures_dict = broadcast_modbus_write_register(ip_list, self.config.modbus.register_address, self.config.modbus.register_value)
+        futures_dict = broadcast_modbus_write_register(ip_list, self.config.modbus.register_address, self.config.modbus.register_value, self.modbus_timeout)
         for ip,future in futures_dict.items():
             try:
                 ok = future.result()
@@ -361,14 +362,25 @@ class TestbenchApp(tk.Tk):
                 self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
 
     def on_modbus_reset_time_count_press(self):
-        pass
+        ip_list = [ip_from_url(url) for url in self.urls]
+        ip_list = [ip for ip in ip_list if ip is not None]
+        futures_dict = broadcast_modbus_write_time_counter(ip_list, 0, self.modbus_timeout)
+        for ip,future in futures_dict.items():
+            try:
+                ok = future.result()
+                if not ok:
+                    self.log(f"[ERROR] {str(ip)} invalid answer to MODBUS request")
+                    continue
+                
+                self.log(f"[INFO] {str(ip)} succesfully answered to MODBUS request")
+            except Exception as e:
+                self.log(f"[ERROR] {str(ip)} did not answered to MODBUS request: {e}")
 
             
     def on_commands_start_test(self):
         """Avvia il test in un thread separato, reimpostando contatori e flag."""
         if self.run_test:
             return
-        
         self.run_test = True
         self.is_paused = False
         self.frames.manual_controls_frame.set_pause_status_label("Stato: In esecuzione")
@@ -709,11 +721,13 @@ class TestbenchApp(tk.Tk):
             self.alimentatore.select_output(channel)
             self.alimentatore.toggle_output(channel, state)
     
-    def try_state_transition(self, next_state: ProcessingState):
+    def try_state_transition(self, next_state: ProcessingState) -> bool:
         self.status.waiting_steps += 1
         if self.status.waiting_steps == self.status.total_waiting_steps:
             self.status.state = next_state
             self.status.waiting_steps = 0
+            return True
+        return False
     
     def test_step(self, dt: float):
         match self.status.state:
@@ -729,9 +743,10 @@ class TestbenchApp(tk.Tk):
                     self.psu_connect()
                     self.psu_init()
                 except Exception as e:
-                    self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
+                    self.log(f"[ERRORE] Connection to PSU failed: {str(e)}")
                     self.status.state = ProcessingState.Failure
                 else:
+                    self.log(f"[ERRORE] Connected to remote PSU")
                     if not self.config.ssh.enabled or \
                         (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
                         self.status.state = ProcessingState.PsuPowerOn
@@ -743,9 +758,10 @@ class TestbenchApp(tk.Tk):
                     self.log(f"[ERRORE] Error while trying to switch on the PSU: {str(e)}")
                     self.status.state = ProcessingState.Failure
                 else:
-                    self.log(f"[INFO] PSU is ON")
                     self.status.state = ProcessingState.PingDelay
                     self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
+                    self.log(f"[INFO] PSU is ON")
+                    self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before the ping procedure")
             
             case ProcessingState.SetupDelay:
                 self.try_state_transition(ProcessingState.Setup)
@@ -766,16 +782,20 @@ class TestbenchApp(tk.Tk):
                 self.log(f"[INFO] Cycle {self.cycle_count}")
                 if self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOn
-                else:
+                else:                    
                     self.status.state = ProcessingState.PingDelay
                     self.status.total_waiting_steps = int(self.config.timing.pre_check_delay / dt)
+                    self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before the ping procedure")
             
             case ProcessingState.PingDelay:
-                self.try_state_transition(ProcessingState.Ping)
+                if self.try_state_transition(ProcessingState.Ping):
+                    self.log(f"[INFO] Ping procedure started")
 
             case ProcessingState.Ping:
                 if not self.ping_procedure():
                     return
+                
+                self.log(f"[INFO] Ping procedure succesfully finished")
                 # update the anomaly count using the size of the cycle_defectives set
                 self.anomaly_count += len(self.cycle_defectives)
                 self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
@@ -783,12 +803,17 @@ class TestbenchApp(tk.Tk):
                 if self.config.modbus.automatic_cycle_count_check_enabled:
                     self.status.state = ProcessingState.ModbusDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the MODBUS procedure")
+                
                 elif self.config.ssh.enabled:
                     self.status.state = ProcessingState.SshDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the SSH procedure")
+                
                 elif self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOffDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the PSI power-off procedure")
                 else:
                     self.status.state = ProcessingState.Setup
             
@@ -798,13 +823,17 @@ class TestbenchApp(tk.Tk):
             case ProcessingState.Modbus:
                 if not self.modbus_check_procedure():
                     self.status.state = ProcessingState.Failure
+                    self.log(f"[ERROR] MODBUS procedure failed")
                     return
+                self.log(f"[INFO] MODBUS procedure succesfully finished")
                 if self.config.ssh.enabled:
                     self.status.state = ProcessingState.SshDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the SSH procedure")
                 elif self.config.connection.psu_enabled:
                     self.status.state = ProcessingState.PsuPowerOffDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the power-off procedure")
                 else:
                     self.status.state = ProcessingState.Setup
             
@@ -814,28 +843,36 @@ class TestbenchApp(tk.Tk):
             case ProcessingState.Ssh:
                 if not self.ssh_procedure():
                     self.status.state = ProcessingState.Failure
+                    self.log(f"[ERROR] SSH procedure failed")
                     return
+                self.log(f"[INFO] SSH procedure succesfully finished")
                 if self.config.modbus.automatic_cycle_count_check_enabled:
                     self.status.state = ProcessingState.ReverseModbusDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the reverse MODBUS procedure")
                 else:
                     self.status.state = ProcessingState.ReversePingDelay
                     self.status.total_waiting_steps = int(self.default_waiting_time / dt)
+                    self.log(f"[INFO] Waiting {self.default_waiting_time}s before the reverse ping procedure")
             
             case ProcessingState.ReversePingDelay:
-                self.try_state_transition(ProcessingState.ReversePing)
+                if self.try_state_transition(ProcessingState.ReversePing):
+                    self.log(f"[INFO] Reverse ping procedure started")
             
             case ProcessingState.ReversePing:
                 if not self.reverse_ping_procedure():
                     return
+                self.log(f"[INFO] Reverse ping procedure succesfully finished")
                 self.status.state = ProcessingState.Setup
             
             case ProcessingState.ReverseModbusDelay:
-                self.try_state_transition(ProcessingState.ReverseModbus)
+                if self.try_state_transition(ProcessingState.ReverseModbus):
+                    self.log(f"[INFO] Reverse MODBUS procedure started")
             
             case ProcessingState.ReverseModbus:
                 if not self.reverse_modbus_check_procedure():
                     return
+                self.log(f"[INFO] Reverse MODBUS succesfully finished")
                 self.status.state = ProcessingState.ReversePingDelay
                 self.status.total_waiting_steps = int(self.default_waiting_time / dt)
             
@@ -851,166 +888,12 @@ class TestbenchApp(tk.Tk):
                 else:
                     self.log(f"[INFO] PSU is OFF")
                     self.status.state = ProcessingState.SetupDelay
+                    self.log(f"[INFO] Waiting {self.config.timing.poweroff_delay}s before starting the next iteration")
                     self.status.total_waiting_steps = int(self.config.timing.poweroff_delay / dt)
             
             case ProcessingState.Failure:
                 pass
     
-    def test_loop(self):
-        """
-        Loop principale di test:
-        - Accende l'alimentatore.
-        - Verifica in parallelo la risposta degli IP tramite ip_responds_curl.
-        - Utilizza la stringa configurabile per costruire l'URL di verifica.
-        """
-        
-        # connect to the PSU only if it's enabled from config
-        if self.config.connection.psu_enabled:
-            self.log(f"[INFO] Connessione all'alimentatore {self.config.connection.psu_address}...")
-            try:
-                self.psu_connect()
-                self.psu_init()
-            except Exception as e:
-                self.log(f"[ERRORE] Impossibile connettersi all'alimentatore: {str(e)}")
-                self.run_test = False
-        
-        if not self.run_test:
-            return
-        
-        # start the main loop
-        while self.wait_with_stop_check(self.config.timing.loop_check_period):
-            # Gestione pausa
-            if self.is_paused:
-                continue
-            
-            self.cycle_defectives.clear()
-            self.t0 = None
-            self.cycle_count += 1
-            self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
-            
-            # clear detection times and GUI
-            for ip in self.urls:
-                self.detection_times[ip] = None
-                self.gui_queue.put(('update_tree', ip, ""))
-                self.gui_queue.put(('remove_tag', ip))
-            
-            self.log(f"[INFO] Cycle {self.cycle_count}")
-            
-            # if the remote PSU is enabled and SSH is disabled, switch on the PSU
-            # if the remote PSU is enabled and SSH is enabled but it's the first cycle, switch on the PSU
-            # otherwise don't switch on the PSU
-            if self.config.connection.psu_enabled:
-                if not self.config.ssh.enabled or (self.config.ssh.enabled and (self.cycle_count - 1) == self.config.timing.cycle_start):
-                    try:
-                        self.psu_poweron()
-                        self.log(f"[INFO] PSU is ON")                    
-                    except Exception as e:
-                        self.log(f"[ERRORE] Error while trying to switch on the PSU: {str(e)}")
-                        continue
-            
-            # wait for precheck delay
-            self.log(f"[INFO] Waiting {self.config.timing.pre_check_delay}s before starting the ping procedure")
-            if not self.wait_with_stop_check(self.config.timing.pre_check_delay):
-                self.log("[INFO] Test stopped, exiting test loop")
-                break
-            
-            # start the pinging loop
-            # it exits if the ping is successfull (every URL has answered)
-            self.log(f"[INFO] Ping procedure started")
-            while self.wait_with_stop_check(self.config.timing.loop_check_period):
-                if self.is_paused:
-                    self.log("[INFO] Ping procedure paused")
-                    continue
-                if self.ping_procedure():
-                    break
-            
-            if not self.run_test:
-                self.log("[INFO] Ping procedure stopped, exiting test loop")
-                break
-            
-            self.log("[INFO] Ping procedure succesfully finished")
-            
-            # update the anomaly count using the size of the cycle_defectives set
-            self.anomaly_count = self.anomaly_count + len(self.cycle_defectives)
-            self.gui_queue.put(('update_label', 'anomaly_count_label', f"Accensioni con anomalia: {self.anomaly_count}"))
-            
-            # check if everyone has the same cycle count reading from registers using MODBUS protocol
-            if self.config.modbus.automatic_cycle_count_check_enabled:
-                modbus_procedure_success = self.modbus_check_procedure()
-                if not modbus_procedure_success:
-                    break
-            
-            if self.config.ssh.enabled:
-                self.log("[INFO] Waiting 5 seconds before starting SSH procedure")
-                if not self.wait_with_stop_check(5):
-                    self.log("[INFO] SSH procedure stopped, exiting test loop")
-                    break
-                
-                ssh_procedure_success = self.ssh_procedure()
-                if not ssh_procedure_success:
-                    break
-                
-                if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
-                    self.log(f"[INFO] Test stopped, exiting test loop")
-                    break
-            
-            elif self.config.connection.psu_enabled:
-                self.log("[INFO] Tutti gli IP hanno risposto. Attendo 5 secondi prima di spegnere l'alimentatore.")
-                if not self.wait_with_stop_check(5):
-                    break
-
-                self.log("[INFO] Spengo alimentatore (canali 1 e 2)...")
-                try:
-                    self.psu_poweroff()
-                    self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento...")
-                    if not self.wait_with_stop_check(self.config.timing.poweroff_delay):
-                        break
-                except Exception as e:
-                    self.log(f"[ERRORE] Errore durante lo spegnimento: {str(e)}")
-                    break
-            
-            if self.config.modbus.automatic_cycle_count_check_enabled:
-                self.log(f"[INFO] Reverse MODBUS procedure started")            
-                while self.wait_with_stop_check(self.config.timing.loop_check_period):
-                    if self.is_paused:
-                        self.log("[INFO] Reverse MODBUS procedure paused")
-                        continue
-                    if self.reverse_modbus_check_procedure():
-                        break
-                
-                if not self.run_test:
-                    self.log("[INFO] Reverse MODBUS procedure stopped, exiting test loop")
-                    break
-            
-                self.log("[INFO] Reverse MODBUS procedure succesfully finished")
-            
-            # start the reverse pinging loop
-            # it exits if the ping is failed (no URL has answered)
-            self.log(f"[INFO] Reverse ping procedure started")
-            while self.wait_with_stop_check(self.config.timing.loop_check_period):
-                if self.is_paused:
-                    self.log("[INFO] Reverse ping procedure paused")
-                    continue
-                if self.reverse_ping_procedure():
-                    break
-            
-            if not self.run_test:
-                self.log("[INFO] Ping procedure stopped, exiting test loop")
-                break
-            
-            self.log("[INFO] Reverse ping procedure succesfully finished")
-            
-        if not self.test_stopped_intentionally and self.config.connection.psu_enabled:
-            self.log("[INFO] Spegnimento finale dell'alimentatore...")
-            try:
-                self.psu_poweroff()
-                self.log(f"[INFO] Attendo {self.config.timing.poweroff_delay} secondi durante lo spegnimento finale...")
-                time.sleep(self.config.timing.poweroff_delay)
-            except Exception as e:
-                self.log(f"[ERRORE] Errore durante lo spegnimento finale: {str(e)}")
-        
-        self.log("[INFO] Test terminato.")
-
     def save_cycle_report(self, ip_first, ip_last, delay):
         """
         Salva nel report:

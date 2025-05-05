@@ -1,6 +1,7 @@
 import datetime
 import subprocess
 import concurrent.futures
+from urllib3.exceptions import InsecureRequestWarning
 import csv
 import os
 from ipaddress import IPv4Address
@@ -11,6 +12,10 @@ from paramiko import AutoAddPolicy, SSHClient
 from concurrent.futures import Future, ThreadPoolExecutor
 import re
 from pyModbusTCP.client import ModbusClient
+
+class ModbusRegisterAddress:
+    PowerOnCounter = 0
+    TimeCounter = 1
 
 def ip_from_url(url: str) -> (IPv4Address | None):
     ip = None
@@ -123,7 +128,10 @@ def broadcast_modbus_write_register(ip_list: set[IPv4Address], reg_addr: int, re
     return future_results
 
 def broadcast_modbus_read_poweron_counter(ip_list: list[IPv4Address], timeout: float) -> dict[IPv4Address, Future[list | None]]:
-    return broadcast_modbus_read_register(ip_list, 0, 1, timeout)
+    return broadcast_modbus_read_register(ip_list, ModbusRegisterAddress.PowerOnCounter, 1, timeout)
 
 def broadcast_modbus_write_poweron_counter(ip_list: list[IPv4Address], reg_value: int, timeout: float) -> dict[IPv4Address, Future[bool]]:
-    return broadcast_modbus_write_register(ip_list, 0, reg_value, timeout)
+    return broadcast_modbus_write_register(ip_list, ModbusRegisterAddress.PowerOnCounter, reg_value, timeout)
+
+def broadcast_modbus_write_time_counter(ip_list: list[IPv4Address], reg_value: int, timeout: float) -> dict[IPv4Address, Future[bool]]:
+    return broadcast_modbus_write_register(ip_list, ModbusRegisterAddress.TimeCounter, reg_value, timeout)
