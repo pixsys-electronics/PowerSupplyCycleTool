@@ -164,48 +164,40 @@ class TestbenchApp(tk.Tk):
         """
         Crea tutti i widget (label, entry, treeview, pulsanti) e li posiziona nella finestra principale.
         """
-        # Configurazione della griglia principale
-        # self.grid_columnconfigure(0, weight=1)
 
-        # self.grid_rowconfigure(0, weight=1)
-        # self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
 
-        # TOP FRAME
-        top_frame = tk.Frame(self)
-        top_frame.grid(row=0, column=0, sticky="nsew")
-        # top_frame.grid_rowconfigure(0, weight=1)
-        # top_frame.grid_columnconfigure(0, weight=1)
-        # top_frame.grid_columnconfigure(1, weight=1)
-
-        # TOP LEFT FRAME
-        top_left_frame = tk.Frame(top_frame)
-        top_left_frame.grid(row=0, column=0, sticky="nsew")
-
-        # TOP RIGHT FRAME
-        top_right_frame = tk.Frame(top_frame)
-        top_right_frame.grid(row=0, column=1, sticky="nsew")
+        # LEFT FRAME
+        left_frame = tk.Frame(self)
+        left_frame.grid(row=0, column=0, sticky="nsew")
+        left_frame.grid_rowconfigure(0, weight=1)
+        left_frame.grid_rowconfigure(1, weight=1)
+        left_frame.grid_rowconfigure(2, weight=1)
+        left_frame.grid_rowconfigure(3, weight=1)
+        left_frame.grid_rowconfigure(4, weight=1)
+        left_frame.grid_rowconfigure(5, weight=1)
+        left_frame.grid_rowconfigure(6, weight=1)
+        left_frame.grid_columnconfigure(0, weight=1)
         
-        # BOTTOM FRAME
-        bottom_frame = tk.Frame(self)
-        bottom_frame.grid(row=1, column=0, sticky="nsew")
+        psu_frame = PsuFrame(left_frame, 0, 0, 5, 5, "nsew")
+        timing_frame = TimingFrame(left_frame, 1, 0, 5, 5, "nsew")
+        ssh_frame = SSHFrame(left_frame, 2, 0, 5, 5, "nsew")
+        modbus_frame = ModbusFrame(left_frame, 3, 0, 5, 5, "nsew")
+        manual_controls_frame = ManualControlsFrame(left_frame, 4, 0, 5, 5, "nsew")
+        info_frame = InfoFrame(left_frame, 5, 0, 5, 5, "nsew")
+        ip_frame = IpTableFrame(left_frame, 6, 0, 5, 5, "nsew")
         
-        # BOTTOM LEFT FRAME
-        bottom_left_frame = tk.Frame(bottom_frame)
-        bottom_left_frame.grid(row=0, column=0, sticky="nsew")
+        # RIGHT FRAME
+        right_frame = tk.Frame(self)
+        right_frame.grid(row=0, column=1, sticky="nsew")
+        right_frame.grid_rowconfigure(0, weight=1)
+        right_frame.grid_rowconfigure(1, weight=1)
+        right_frame.grid_columnconfigure(0, weight=1)
         
-        # BOTTOM RIGHT FRAME
-        bottom_right_frame = tk.Frame(bottom_frame)
-        bottom_right_frame.grid(row=0, column=1, sticky="nsew")
-        
-        psu_frame = PsuFrame(top_left_frame, 0, 0, 5, 5, "nsew")
-        timing_frame = TimingFrame(top_left_frame, 1, 0, 5, 5, "nsew")
-        ssh_frame = SSHFrame(top_left_frame, 2, 0, 5, 5, "nsew")
-        modbus_frame = ModbusFrame(top_left_frame, 3, 0, 5, 5, "nsew")
-        manual_controls_frame = ManualControlsFrame(bottom_left_frame, 0, 0, 5, 5, "nsew")
-        info_frame = InfoFrame(bottom_left_frame, 1, 0, 5, 5, "nsew")
-        ip_frame = IpTableFrame(bottom_left_frame, 2, 0, 5, 5, "nsew")
-        file_frame = FileFrame(bottom_right_frame, 0, 0, 5, 5, "nsew")
-        log_frame = LogFrame(top_right_frame, 0, 0, 5, 5, "nsew")
+        file_frame = FileFrame(right_frame, 0, 0, 5, 5, "nsew")
+        log_frame = LogFrame(right_frame, 1, 0, 5, 5, "nsew")
         
         self.frames = TestbenchFrames(psu_frame, timing_frame, ssh_frame, modbus_frame, file_frame, manual_controls_frame, info_frame, ip_frame, log_frame)
         

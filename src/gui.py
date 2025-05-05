@@ -160,7 +160,7 @@ class SSHFrame(tk.LabelFrame):
         username_label.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         self.username_var = tk.StringVar(credentials_frame)
         self.username_var.trace_add("write", self.on_username_change)
-        username = tk.Entry(credentials_frame, width=40, textvariable=self.username_var)
+        username = tk.Entry(credentials_frame, textvariable=self.username_var)
         username.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
         
         # password
@@ -168,7 +168,7 @@ class SSHFrame(tk.LabelFrame):
         password_label.grid(row=1, column=0, sticky="w", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         self.password_var = tk.StringVar(credentials_frame)
         self.password_var.trace_add("write", self.on_password_change)
-        password = tk.Entry(credentials_frame, width=40, textvariable=self.password_var)
+        password = tk.Entry(credentials_frame, textvariable=self.password_var)
         password.grid(row=1, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
         
         # command
@@ -176,7 +176,7 @@ class SSHFrame(tk.LabelFrame):
         command_label.grid(row=2, column=0, sticky="w", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         self.command_var = tk.StringVar(credentials_frame)
         self.command_var.trace_add("write", self.on_command_change)
-        command = tk.Entry(credentials_frame, width=40, textvariable=self.command_var)
+        command = tk.Entry(credentials_frame, textvariable=self.command_var)
         command.grid(row=2, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
     
     def set_ssh_enabled(self, value: bool):
@@ -516,15 +516,13 @@ class IpTableFrame(tk.LabelFrame):
         self.tree = ttk.Treeview(self, columns=columns, show="headings")
         self.tree.heading("ip", text="Indirizzo IP")
         self.tree.heading("detected", text="Rilevato alle (HH:MM:SS)")
-        self.tree.column("ip", width=200)
-        self.tree.column("detected", width=300)
-
+        
         # Definizione dei tag per la Treeview
         self.tree.tag_configure('error', foreground='red')
         self.tree.tag_configure('normal', foreground='black')
 
         # Set fixed height (for example, 10 rows max visible)
-        self.tree.config(height=10)
+        # self.tree.config(height=10)
 
         # Pack Treeview with fill='y' so it adjusts to the height
         self.tree.pack(side='left', fill='both', expand=True)
@@ -556,9 +554,8 @@ class FileFrame(tk.LabelFrame):
         super().__init__(parent, text="File")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
-        self.file = scrolledtext.ScrolledText(self, width=50)
+        self.file = scrolledtext.ScrolledText(self)
         self.file.grid(row=0, column=0, sticky="nsew")
-        self.file.config(height=17)
 
         apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
         apply_button.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT)
@@ -587,9 +584,9 @@ class LogFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Log")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
-        self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=65)
+        self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
         self.log_text.grid(row=0, column=0, sticky="nsew")
-        self.log_text.config(height=23)
+        # self.log_text.config(height=23)
         self.log_text.tag_configure(LogType.Error.value, foreground="red")
         self.log_text.tag_configure(LogType.Warn.value, foreground="orange")
         self.log_text.tag_configure(LogType.Info.value, foreground="black")
