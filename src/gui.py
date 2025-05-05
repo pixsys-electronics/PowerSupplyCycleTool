@@ -145,6 +145,9 @@ class SSHFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky): 
         super().__init__(parent, text="SSH")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
         
         self.ssh_enabled_var = tk.IntVar(self)
         
@@ -153,7 +156,12 @@ class SSHFrame(tk.LabelFrame):
         
         # credentials frame
         credentials_frame = tk.Frame(self)
-        credentials_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
+        credentials_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nsew")
+        credentials_frame.grid_columnconfigure(0, weight=1)
+        credentials_frame.grid_columnconfigure(1, weight=1)
+        credentials_frame.grid_rowconfigure(0, weight=1)
+        credentials_frame.grid_rowconfigure(1, weight=1)
+        credentials_frame.grid_rowconfigure(2, weight=1)
         
         # username
         username_label = tk.Label(credentials_frame, text="Username")
@@ -161,23 +169,23 @@ class SSHFrame(tk.LabelFrame):
         self.username_var = tk.StringVar(credentials_frame)
         self.username_var.trace_add("write", self.on_username_change)
         username = tk.Entry(credentials_frame, textvariable=self.username_var)
-        username.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
+        username.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
         
         # password
         password_label = tk.Label(credentials_frame, text="Password")
-        password_label.grid(row=1, column=0, sticky="w", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+        password_label.grid(row=1, column=0, sticky="nw", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         self.password_var = tk.StringVar(credentials_frame)
         self.password_var.trace_add("write", self.on_password_change)
         password = tk.Entry(credentials_frame, textvariable=self.password_var)
-        password.grid(row=1, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
+        password.grid(row=1, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
         
         # command
         command_label = tk.Label(credentials_frame, text="Command")
-        command_label.grid(row=2, column=0, sticky="w", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+        command_label.grid(row=2, column=0, sticky="nw", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         self.command_var = tk.StringVar(credentials_frame)
         self.command_var.trace_add("write", self.on_command_change)
         command = tk.Entry(credentials_frame, textvariable=self.command_var)
-        command.grid(row=2, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
+        command.grid(row=2, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
     
     def set_ssh_enabled(self, value: bool):
         value = int(value)
@@ -240,6 +248,9 @@ class TimingFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Timing")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
 
         labels_entries = [
             ("Delay before ping procedure (s)", "precheck", "float"),
@@ -252,6 +263,7 @@ class TimingFrame(tk.LabelFrame):
         for idx, (label_text, entry_name, data_type) in enumerate(labels_entries):
             label = tk.Label(self, text=label_text)
             label.grid(row=idx, column=0, sticky="nw", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+            self.grid_rowconfigure(idx, weight=1)
             
             entry_var = None
             match data_type:
@@ -271,7 +283,7 @@ class TimingFrame(tk.LabelFrame):
 
             setattr(self, f"{entry_name}_var", entry_var)
             entry = tk.Entry(self, textvariable=entry_var)
-            entry.grid(row=idx, column=1, sticky="ne", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+            entry.grid(row=idx, column=1, sticky="new", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
             setattr(self, entry_name, entry)
     
     def set_precheck(self, value: float):
@@ -354,21 +366,29 @@ class PsuFrame(tk.LabelFrame):
         super().__init__(parent, text="PSU")
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
-
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        
+        # ROW 0
         self.psu_enabled_var = tk.IntVar(self)
         psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled_var, command=self.on_psu_enable_change)
         psu_enabled_checkbutton.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
+        # ROW 1
         psu_ip_label = tk.Label(self, text="PSU address (aa:bb:cc:dd)")
         psu_ip_label.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         self.psu_ip_var = tk.StringVar(self)
         self.psu_ip_var.trace_add("write", self.on_psu_ip_change)
         self.psu_ip = tk.Entry(self, textvariable=self.psu_ip_var)
-        self.psu_ip.grid(row=1, column=1, sticky="ne")
+        self.psu_ip.grid(row=1, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
         
+        # ROW 2
         buttons_frame = tk.Frame(self)
-        buttons_frame.grid(row=2, column=0, sticky="nw")
+        buttons_frame.grid(row=2, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         force_on_button = tk.Button(buttons_frame, text="On", command=self.on_force_poweron_button_press)
         force_on_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
