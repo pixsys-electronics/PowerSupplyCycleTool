@@ -393,6 +393,7 @@ class TestbenchApp(tk.Tk):
         self.log_info("Test avviato.")
         self.test_start_time = time.time()
         self.update_elapsed_time()
+        self.update_time_before_next_state()
         self.test_stopped_intentionally = False
         self.cycle_count = self.config.timing.cycle_start
         self.gui_queue.put(('update_label', 'cycle_count_label', f"Accensioni eseguite: {self.cycle_count}"))
@@ -918,13 +919,24 @@ class TestbenchApp(tk.Tk):
 
     def update_elapsed_time(self):
         """Aggiorna il timer dell'interfaccia."""
-        if self.run_test and self.test_start_time is not None:
-            elapsed = time.time() - self.test_start_time
-            hours, remainder = divmod(int(elapsed), 3600)
-            minutes, seconds = divmod(remainder, 60)
-            elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-            self.frames.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
-            self.after(int(self.timer_processing_period * 1000), self.update_elapsed_time)
+        if not (self.run_test and self.test_start_time is not None):
+            return
+        elapsed = time.time() - self.test_start_time
+        hours, remainder = divmod(int(elapsed), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        self.frames.info_frame.set_elapsed_time_label(f"Tempo dall'avvio: {elapsed_str}")
+        self.after(int(self.timer_processing_period * 1000), self.update_elapsed_time)
+    
+    def update_time_before_next_state(self):
+        if not self.run_test:
+            return
+        time_to_next_state = (self.status.total_waiting_steps - self.status.waiting_steps) * self.state_machine_dt
+        hours, remainder = divmod(int(time_to_next_state), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        time_to_next_state_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        self.frames.info_frame.set_time_to_next_state(f"Time to next state: {time_to_next_state_str}")
+        self.after(int(self.timer_processing_period * 1000), self.update_time_before_next_state)
     
 # Avvio dell'applicazione
 if __name__ == "__main__":

@@ -462,24 +462,37 @@ class ManualControlsFrame(tk.LabelFrame):
 
 class InfoFrame(tk.LabelFrame):
     elapsed_time_label: tk.Label
+    time_to_next_state: tk.Label
     cycle_count_label: tk.Label
     anomaly_count_label: tk.Label
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Info")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        
+        counters_frame = tk.Frame(self)
+        counters_frame.grid(row=0, column=0, padx=0, pady=0, sticky=sticky)
 
-        self.elapsed_time_label = tk.Label(self, text="Test non ancora partito.")
-        self.elapsed_time_label.pack(side="left", padx=5)
-
-        self.cycle_count_label = tk.Label(self, text="Accensioni eseguite: 0")
+        self.cycle_count_label = tk.Label(counters_frame, text="Accensioni eseguite: 0")
         self.cycle_count_label.pack(side="left", padx=5)
-
-        self.anomaly_count_label = tk.Label(self, text="Accensioni con anomalia: 0")
+        
+        self.anomaly_count_label = tk.Label(counters_frame, text="Accensioni con anomalia: 0")
         self.anomaly_count_label.pack(side="left", padx=5)
+        
+        times_frame = tk.Frame(self)
+        times_frame.grid(row=1, column=0, padx=0, pady=0, sticky=sticky)
+        
+        self.elapsed_time_label = tk.Label(times_frame, text="Test non ancora partito.")
+        self.elapsed_time_label.pack(side="left", padx=5)
+        
+        self.time_to_next_state = tk.Label(times_frame, text="Time to next state")
+        self.time_to_next_state.pack(side="left", padx=5)
     
     def set_elapsed_time_label(self, value: str):
         self.elapsed_time_label.configure(text=value)
+    
+    def set_time_to_next_state(self, value: str):
+        self.time_to_next_state.configure(text=value)
     
     def set_cycle_count_label(self, value: str):
         self.cycle_count_label.configure(text=value)
