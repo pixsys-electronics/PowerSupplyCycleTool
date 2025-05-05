@@ -520,21 +520,22 @@ class TestbenchApp(tk.Tk):
         while True:
             try:
                 gui_msg = self.gui_queue.get_nowait()
-                if gui_msg[0] == 'update_label':
-                    _, label_name, text = gui_msg
-                    if label_name == 'anomaly_count_label':
-                        self.frames.info_frame.set_anomaly_count_label(text)
-                    elif label_name == 'cycle_count_label':
-                        self.frames.info_frame.set_cycle_count_label(text)
-                elif gui_msg[0] == 'update_tree':
-                    ip, detected_time = gui_msg[1], gui_msg[2]
-                    self.frames.ip_frame.tree_set(ip, "detected", detected_time)
-                elif gui_msg[0] == 'highlight_error':
-                    ip = gui_msg[1]
-                    self.frames.ip_frame.tree_item(ip, ('error',))
-                elif gui_msg[0] == 'remove_tag':
-                    ip = gui_msg[1]
-                    self.frames.ip_frame.tree_item(ip, ('normal',))
+                if len(gui_msg) > 0:
+                    if gui_msg[0] == 'update_label':
+                        _, label_name, text = gui_msg
+                        if label_name == 'anomaly_count_label':
+                            self.frames.info_frame.set_anomaly_count_label(text)
+                        elif label_name == 'cycle_count_label':
+                            self.frames.info_frame.set_cycle_count_label(text)
+                    elif gui_msg[0] == 'update_tree':
+                        ip, detected_time = gui_msg[1], gui_msg[2]
+                        self.frames.ip_frame.tree_set(ip, "detected", detected_time)
+                    elif gui_msg[0] == 'highlight_error':
+                        ip = gui_msg[1]
+                        self.frames.ip_frame.tree_item(ip, ('error',))
+                    elif gui_msg[0] == 'remove_tag':
+                        ip = gui_msg[1]
+                        self.frames.ip_frame.tree_item(ip, ('normal',))
             except queue.Empty:
                 break
             except Exception as e:
@@ -604,11 +605,12 @@ class TestbenchApp(tk.Tk):
         # if every URL has answered, generate the report file and exit
         if all(self.detection_times[ip] is not None for ip in self.urls):
             detection_sorted = sorted(self.detection_times.items(), key=lambda x: x[1])
-            ip_first, t_first = detection_sorted[0]
-            ip_last, t_last = detection_sorted[-1]
-            delay = (t_last - t_first).total_seconds()
-            self.save_cycle_report(ip_first, ip_last, delay)
-            return True
+            if len(detection_sorted) > 0:
+                ip_first, t_first = detection_sorted[0]
+                ip_last, t_last = detection_sorted[-1]
+                delay = (t_last - t_first).total_seconds()
+                self.save_cycle_report(ip_first, ip_last, delay)
+                return True
         
         # finally check who didn't responded yet
         non_rilevati = [ip for ip in self.urls if self.detection_times[ip] is None]
@@ -646,7 +648,7 @@ class TestbenchApp(tk.Tk):
         for ip,future in futures_dict.items():
             try:
                 regs = future.result()
-                if regs is None:
+                if regs is None or len(regs) == 0:
                     self.log_error(f"{str(ip)} invalid answer to MODBUS request")
                     cycle_count_failure = True
                     break
