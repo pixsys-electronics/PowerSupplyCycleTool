@@ -23,6 +23,10 @@ class ModbusFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="MODBUS")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
         
         self.modbus_enable_automatic_cycle_count_var = tk.IntVar(self)
         modbus_enable_checkbutton = tk.Checkbutton(self, text='Enable automatic cycle count check',variable=self.modbus_enable_automatic_cycle_count_var, command=self.on_modbus_enable_change)
@@ -30,14 +34,17 @@ class ModbusFrame(tk.LabelFrame):
         
         # ROW1 - register frame
         register_frame = tk.Frame(self)
-        register_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
+        register_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nsew")
+        register_frame.grid_columnconfigure(0, weight=1)
+        register_frame.grid_rowconfigure(0, weight=1)
+        register_frame.grid_rowconfigure(1, weight=1)
         
         modbus_register_address_label = tk.Label(register_frame, text="Register address")
         modbus_register_address_label.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         self.modbus_register_address_var = tk.IntVar()
         self.modbus_register_address_var.trace_add("write", self.on_register_address_change)
         modbus_register_address_entry = tk.Entry(register_frame, textvariable=self.modbus_register_address_var)
-        modbus_register_address_entry.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
+        modbus_register_address_entry.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
         
         register_value_label = tk.Label(register_frame, text="Register value")
         register_value_label.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
@@ -48,7 +55,7 @@ class ModbusFrame(tk.LabelFrame):
         
         # ROW2 - buttons frame
         buttons_frame = tk.Frame(self)
-        buttons_frame.grid(row=2, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
+        buttons_frame.grid(row=2, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nsew")
         
         modbus_read_register_button = tk.Button(buttons_frame, text="Read", command=self.on_read_register_press)
         modbus_read_register_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
@@ -494,6 +501,9 @@ class InfoFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Info")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
         
         counters_frame = tk.Frame(self)
         counters_frame.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky=sticky)
@@ -529,7 +539,7 @@ class IpTableFrame(tk.LabelFrame):
     tree: ttk.Treeview
     
     def __init__(self, parent, row, col, padx, pady, sticky):
-        super().__init__(parent, text="IP table")
+        super().__init__(parent, text="Detection table")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         columns = ("ip", "detected")
@@ -573,6 +583,9 @@ class FileFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="File")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
         
         self.file = scrolledtext.ScrolledText(self)
         self.file.grid(row=0, column=0, sticky="nsew")
@@ -604,6 +617,9 @@ class LogFrame(tk.LabelFrame):
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="Log")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        
         self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
         self.log_text.grid(row=0, column=0, sticky="nsew")
         # self.log_text.config(height=23)
