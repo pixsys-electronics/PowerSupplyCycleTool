@@ -249,7 +249,7 @@ class TestbenchApp(tk.Tk):
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path) as f: content = f.read()
         
-        self.frames.file_frame.load_text(content)
+        self.frames.file_frame.load_csv(content)
         self.frames.file_frame.set_apply_button_press_cb(self.on_file_apply_press)
         
         self.update()
@@ -456,13 +456,13 @@ class TestbenchApp(tk.Tk):
             self.log_info("Test ripreso.")
     
     def on_file_apply_press(self):
-        content = self.frames.file_frame.get_text()
-        self.urls = url_list_from_csv(content)
+        text = self.frames.file_frame.get_csv()
+        self.urls = url_list_from_csv(text)
         self.refresh_address_table()
         
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path, mode="w", encoding="utf-8") as file:
-            file.write(content)
+            file.write(text)
         
     def save_config(self):
         config_path = os.path.join(os.getcwd(), self.config_filename)

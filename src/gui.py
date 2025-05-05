@@ -577,6 +577,7 @@ class IpTableFrame(tk.LabelFrame):
         self.tree.insert("", tk.END, iid=ip, values=values, tags=tags)
 
 class FileFrame(tk.LabelFrame):
+    header: str = ''
     file: scrolledtext.ScrolledText
     apply_button_press_cb: Callable[[], None] | None = None
     
@@ -600,11 +601,19 @@ class FileFrame(tk.LabelFrame):
         if self.apply_button_press_cb is not None:
             self.apply_button_press_cb()
     
-    def load_text(self, content: str):
+    def load_csv(self, text: str):
+        header, _, content = text.partition('\n')
+        self.header = header
         self.file.insert('1.0', content)
     
-    def get_text(self):
+    def get_header(self) -> str:
+        return self.header
+    
+    def get_content(self):
         return self.file.get("1.0", "end-1c")
+
+    def get_csv(self):
+        return "\n".join([self.get_header(), self.get_content()])
 
 class LogType(Enum):
     Error = "error"
