@@ -148,7 +148,7 @@ class SSHFrame(tk.LabelFrame):
         
         self.ssh_enabled_var = tk.IntVar(self)
         
-        ssh_enabled_checkbutton = tk.Checkbutton(self, text='Run SSH command on power-off',variable=self.ssh_enabled_var, command=self.on_ssh_enabled_change)
+        ssh_enabled_checkbutton = tk.Checkbutton(self, text='Replace PSU power-off with SSH command',variable=self.ssh_enabled_var, command=self.on_ssh_enabled_change)
         ssh_enabled_checkbutton.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         # credentials frame
@@ -242,11 +242,11 @@ class TimingFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         labels_entries = [
-            ("Attesa prima di controllare IP (Pre-check):", "precheck", "float"),
-            ("Intervallo tra controlli IP:", "checkloop", "float"),
-            ("Durata spegnimento:", "speg", "float"),
-            ("Massimo ritardo avvio dispositivi:", "maxdelay", "float"),
-            ("Conteggio di partenza:", "cycle_start", "int")
+            ("Delay before ping procedure (s)", "precheck", "float"),
+            ("Delay between ping procedures (s)", "checkloop", "float"),
+            ("Delay after PSU power-off (s):", "speg", "float"),
+            ("Max. delay between ping responses (s):", "maxdelay", "float"),
+            ("Starting cycle count:", "cycle_start", "int")
         ]
 
         for idx, (label_text, entry_name, data_type) in enumerate(labels_entries):
@@ -347,25 +347,34 @@ class PsuFrame(tk.LabelFrame):
     psu_enabled_var: tk.IntVar
     psu_ip_change_cb: Callable[[str], None] | None = None
     psu_enabled_change_cb: Callable[[bool], None] | None = None
+    force_on_button_press_cb: Callable[[], None] | None = None
+    force_off_button_press_cb: Callable[[], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
         super().__init__(parent, text="PSU")
         # Frame 1: IP Alimentatore, Range IP e URL di verifica
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
-        # Riga 1: use remote PSU
         self.psu_enabled_var = tk.IntVar(self)
         psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled_var, command=self.on_psu_enable_change)
         psu_enabled_checkbutton.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
-        # Riga 0: IP Alimentatore, IP Start e IP End
-        psu_ip_label = tk.Label(self, text="IP Alimentatore:")
+        psu_ip_label = tk.Label(self, text="PSU address (aa:bb:cc:dd)")
         psu_ip_label.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         self.psu_ip_var = tk.StringVar(self)
         self.psu_ip_var.trace_add("write", self.on_psu_ip_change)
         self.psu_ip = tk.Entry(self, textvariable=self.psu_ip_var)
         self.psu_ip.grid(row=1, column=1, sticky="ne")
+        
+        buttons_frame = tk.Frame(self)
+        buttons_frame.grid(row=2, column=0, sticky="nw")
+        
+        force_on_button = tk.Button(buttons_frame, text="On", command=self.on_force_poweron_button_press)
+        force_on_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+
+        force_off_button = tk.Button(buttons_frame, text="Off", command=self.on_force_poweronff_button_press)
+        force_off_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def set_psu_ip(self, value: str):
         self.psu_ip_var.set(value)
@@ -380,6 +389,12 @@ class PsuFrame(tk.LabelFrame):
     def set_psu_enabled_change_cb(self, cb: Callable[[str], None]):
         self.psu_enabled_change_cb = cb
     
+    def set_force_on_button_press_cb(self, cb: Callable[[], None]):
+        self.force_on_button_press_cb = cb
+   
+    def set_force_off_button_press_cb(self, cb: Callable[[], None]):
+        self.force_off_button_press_cb = cb
+    
     def on_psu_ip_change(self, *args):
         if self.psu_ip_change_cb is not None:
             value = self.psu_ip_var.get()
@@ -390,6 +405,15 @@ class PsuFrame(tk.LabelFrame):
             value = self.psu_enabled_var.get()
             value = value == 1
             self.psu_enabled_change_cb(value)
+    
+    def on_force_poweron_button_press(self):
+        if self.force_on_button_press_cb is not None:
+            self.force_on_button_press_cb()
+    
+    def on_force_poweronff_button_press(self):
+        if self.force_off_button_press_cb is not None:
+            self.force_off_button_press_cb()
+
 
 class ManualControlsFrame(tk.LabelFrame):
     pause_button: tk.Button
@@ -397,11 +421,9 @@ class ManualControlsFrame(tk.LabelFrame):
     start_button_press_cb: Callable[[], None] | None = None
     stop_button_press_cb: Callable[[], None] | None = None
     pause_button_press_cb: Callable[[], None] | None = None
-    force_on_button_press_cb: Callable[[], None] | None = None
-    force_off_button_press_cb: Callable[[], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky):
-        super().__init__(parent, text="Controlli Manuali")
+        super().__init__(parent, text="Test commands")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         start_button = tk.Button(self, text="Start", command=self.on_start_button_press)
@@ -412,12 +434,6 @@ class ManualControlsFrame(tk.LabelFrame):
 
         self.pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
         self.pause_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
-
-        force_on_button = tk.Button(self, text="Forza ON", command=self.on_force_poweron_button_press)
-        force_on_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
-
-        force_off_button = tk.Button(self, text="Forza OFF", command=self.on_force_poweronff_button_press)
-        force_off_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         self.pause_status_label = tk.Label(self, text="Stato: In esecuzione")
         self.pause_status_label.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
@@ -436,12 +452,6 @@ class ManualControlsFrame(tk.LabelFrame):
    
     def set_pause_button_press_cb(self, cb: Callable[[], None]):
         self.pause_button_press_cb = cb
-   
-    def set_force_on_button_press_cb(self, cb: Callable[[], None]):
-        self.force_on_button_press_cb = cb
-   
-    def set_force_off_button_press_cb(self, cb: Callable[[], None]):
-        self.force_off_button_press_cb = cb
     
     def on_start_button_press(self):
         if self.start_button_press_cb is not None:
@@ -454,14 +464,6 @@ class ManualControlsFrame(tk.LabelFrame):
     def on_pause_button_press(self):
         if self.pause_button_press_cb is not None:
             self.pause_button_press_cb()
-    
-    def on_force_poweron_button_press(self):
-        if self.force_on_button_press_cb is not None:
-            self.force_on_button_press_cb()
-    
-    def on_force_poweronff_button_press(self):
-        if self.force_off_button_press_cb is not None:
-            self.force_off_button_press_cb()
 
 class InfoFrame(tk.LabelFrame):
     elapsed_time_label: tk.Label
@@ -476,16 +478,16 @@ class InfoFrame(tk.LabelFrame):
         counters_frame = tk.Frame(self)
         counters_frame.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky=sticky)
 
-        self.cycle_count_label = tk.Label(counters_frame, text="Accensioni eseguite: 0")
+        self.cycle_count_label = tk.Label(counters_frame, text="Test cycles: 0")
         self.cycle_count_label.pack(side="left", padx=5)
         
-        self.anomaly_count_label = tk.Label(counters_frame, text="Accensioni con anomalia: 0")
+        self.anomaly_count_label = tk.Label(counters_frame, text="Test cycles with anomalies: 0")
         self.anomaly_count_label.pack(side="left", padx=5)
         
         times_frame = tk.Frame(self)
         times_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky=sticky)
         
-        self.elapsed_time_label = tk.Label(times_frame, text="Test non ancora partito.")
+        self.elapsed_time_label = tk.Label(times_frame, text="Test not started yet")
         self.elapsed_time_label.pack(side="left", padx=5)
         
         self.time_to_next_state = tk.Label(times_frame, text="Time to next state")

@@ -213,6 +213,8 @@ class TestbenchApp(tk.Tk):
         self.frames.psu_frame.set_psu_ip(self.config.connection.psu_address)
         self.frames.psu_frame.set_psu_enabled_change_cb(self.on_psu_enable_change)
         self.frames.psu_frame.set_psu_ip_change_cb(self.on_psu_ip_change)
+        self.frames.psu_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
+        self.frames.psu_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
         
         self.frames.timing_frame.set_precheck(self.config.timing.pre_check_delay)
         self.frames.timing_frame.set_checkloop(self.config.timing.loop_check_period)
@@ -251,8 +253,6 @@ class TestbenchApp(tk.Tk):
         self.frames.manual_controls_frame.set_start_button_press_cb(self.on_commands_start_test)
         self.frames.manual_controls_frame.set_stop_button_press_cb(self.on_commands_stop_test)
         self.frames.manual_controls_frame.set_pause_button_press_cb(self.on_commands_toggle_pause)
-        self.frames.manual_controls_frame.set_force_on_button_press_cb(self.on_commands_force_power_on)
-        self.frames.manual_controls_frame.set_force_off_button_press_cb(self.on_commands_force_power_off)
         
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
         with open(url_list_path) as f: content = f.read()
@@ -417,8 +417,13 @@ class TestbenchApp(tk.Tk):
             if self.is_paused:
                 continue
             self.test_step(self.state_machine_dt)
+            if self.status.state == ProcessingState.Failure:
+                self.run_test = False
         
-        self.log_info("Test loop has been stopped")
+        if self.status.state == ProcessingState.Failure:
+            self.log_error("Test loop has failed")
+        else:
+            self.log_info("Test loop has been stopped")
     
     def on_commands_stop_test(self):
         """Ferma il test in modo pulito."""
