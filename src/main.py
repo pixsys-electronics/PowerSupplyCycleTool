@@ -825,7 +825,8 @@ class TestbenchApp(tk.Tk):
                     self.status.state = ProcessingState.Setup
             
             case ProcessingState.ModbusDelay:
-                self.try_state_transition(ProcessingState.Modbus)
+                if self.try_state_transition(ProcessingState.Modbus):
+                    self.log_info(f"MODBUS procedure started")
             
             case ProcessingState.Modbus:
                 if not self.modbus_check_procedure():
@@ -845,7 +846,8 @@ class TestbenchApp(tk.Tk):
                     self.status.state = ProcessingState.Setup
             
             case ProcessingState.SshDelay:
-                self.try_state_transition(ProcessingState.Ssh)
+                if self.try_state_transition(ProcessingState.Ssh):
+                    self.log_info(f"SSH procedure started")
             
             case ProcessingState.Ssh:
                 if not self.ssh_procedure():
@@ -884,7 +886,8 @@ class TestbenchApp(tk.Tk):
                 self.status.total_waiting_steps = int(self.default_waiting_time / dt)
             
             case ProcessingState.PsuPowerOffDelay:
-                self.try_state_transition(ProcessingState.PsuPowerOff)
+                if self.try_state_transition(ProcessingState.PsuPowerOff):
+                    self.log_info(f"PSU power-off procedure started")
 
             case ProcessingState.PsuPowerOff:
                 try:
