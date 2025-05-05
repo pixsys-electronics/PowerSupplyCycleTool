@@ -634,7 +634,7 @@ class LogFrame(tk.LabelFrame):
         if timestamp is not None:
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             now_str = f"[{now_str}] "
-            self.log_text.insert(tk.END, now_str, LogType.Timestamp)
+            self.log_text.insert(tk.END, now_str, LogType.Timestamp.value)
         self.log_text.insert(tk.END, f"{msg}\n", type.value)
         self.log_text.config(state=tk.DISABLED)
     
