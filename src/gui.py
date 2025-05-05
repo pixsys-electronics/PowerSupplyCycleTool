@@ -610,6 +610,7 @@ class LogType(Enum):
     Error = "error"
     Warn = "warning"
     Info = "info"
+    Timestamp = "timestamp"
 
 class LogFrame(tk.LabelFrame):
     log_text: scrolledtext.ScrolledText
@@ -622,20 +623,19 @@ class LogFrame(tk.LabelFrame):
         
         self.log_text = scrolledtext.ScrolledText(self, wrap=tk.WORD)
         self.log_text.grid(row=0, column=0, sticky="nsew")
-        # self.log_text.config(height=23)
         self.log_text.tag_configure(LogType.Error.value, foreground="red")
         self.log_text.tag_configure(LogType.Warn.value, foreground="orange")
         self.log_text.tag_configure(LogType.Info.value, foreground="black")
+        self.log_text.tag_configure(LogType.Timestamp.value, foreground="blue")
         self.log_text.config(state=tk.DISABLED)
     
     def add_log(self, msg: str, type: LogType, timestamp: Optional[datetime.datetime]):
-        message = ""
+        self.log_text.config(state=tk.NORMAL)
         if timestamp is not None:
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            message += f"[{now_str}]"
-        message += f"{msg}\n"
-        self.log_text.config(state=tk.NORMAL)
-        self.log_text.insert(tk.END, message, type.value)
+            now_str = f"[{now_str}] "
+            self.log_text.insert(tk.END, now_str, LogType.Timestamp)
+        self.log_text.insert(tk.END, f"{msg}\n", type.value)
         self.log_text.config(state=tk.DISABLED)
     
     def scroll_down(self):
