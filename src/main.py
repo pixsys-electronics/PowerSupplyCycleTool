@@ -673,10 +673,11 @@ class TestbenchApp(tk.Tk):
         cycle_count_success = True
         for ip,future in futures_dict.items():
             try:
-                _ = future.result()
-                cycle_count_success = False
-                self.log_warn(f"{str(ip)} answered to MODBUS")
-                break
+                regs = future.result()
+                if regs is not None:
+                    cycle_count_success = False
+                    self.log_warn(f"{str(ip)} answered to MODBUS")
+                    break
             except Exception as e:
                 pass
         
