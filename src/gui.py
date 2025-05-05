@@ -4,6 +4,9 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 from typing import Callable, Optional
 
+PADX_DEFAULT = 2
+PADY_DEFAULT = 2
+
 class ModbusFrame(tk.LabelFrame):
     modbus_enable_automatic_cycle_count_var: tk.IntVar
     modbus_register_address_var: tk.IntVar
@@ -23,41 +26,41 @@ class ModbusFrame(tk.LabelFrame):
         
         self.modbus_enable_automatic_cycle_count_var = tk.IntVar(self)
         modbus_enable_checkbutton = tk.Checkbutton(self, text='Enable automatic cycle count check',variable=self.modbus_enable_automatic_cycle_count_var, command=self.on_modbus_enable_change)
-        modbus_enable_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        modbus_enable_checkbutton.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         # ROW1 - register frame
         register_frame = tk.Frame(self)
-        register_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+        register_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         modbus_register_address_label = tk.Label(register_frame, text="Register address")
-        modbus_register_address_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        modbus_register_address_label.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         self.modbus_register_address_var = tk.IntVar()
         self.modbus_register_address_var.trace_add("write", self.on_register_address_change)
         modbus_register_address_entry = tk.Entry(register_frame, textvariable=self.modbus_register_address_var)
-        modbus_register_address_entry.grid(row=0, column=1, padx=0, pady=0, sticky="ne")
+        modbus_register_address_entry.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
         
         register_value_label = tk.Label(register_frame, text="Register value")
-        register_value_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+        register_value_label.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         self.modbus_register_value_var = tk.IntVar()
         self.modbus_register_value_var.trace_add("write", self.on_register_value_change)
         modbus_register_value_entry = tk.Entry(register_frame, textvariable=self.modbus_register_value_var)
-        modbus_register_value_entry.grid(row=1, column=1, padx=0, pady=0, sticky="new")
+        modbus_register_value_entry.grid(row=1, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
         
         # ROW2 - buttons frame
         buttons_frame = tk.Frame(self)
-        buttons_frame.grid(row=2, column=0, padx=0, pady=0, sticky="nw")
+        buttons_frame.grid(row=2, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         modbus_read_register_button = tk.Button(buttons_frame, text="Read", command=self.on_read_register_press)
-        modbus_read_register_button.pack(side="left", padx=0, pady=0)
+        modbus_read_register_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         force_write_button = tk.Button(buttons_frame, text="Write", command=self.on_write_register_press)
-        force_write_button.pack(side="left", padx=0, pady=0)
+        force_write_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         
         reset_cycle_count_button = tk.Button(buttons_frame, text="Reset cycle count", command=self.on_reset_cycle_count_press)
-        reset_cycle_count_button.pack(side="left", padx=0, pady=0)
+        reset_cycle_count_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         
         reset_time_count_button = tk.Button(buttons_frame, text="Reset time count", command=self.on_reset_time_count_press)
-        reset_time_count_button.pack(side="left", padx=0, pady=0)
+        reset_time_count_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def set_modbus_enable(self, value: bool):
         value = int(value)
@@ -146,35 +149,35 @@ class SSHFrame(tk.LabelFrame):
         self.ssh_enabled_var = tk.IntVar(self)
         
         ssh_enabled_checkbutton = tk.Checkbutton(self, text='Run SSH command on power-off',variable=self.ssh_enabled_var, command=self.on_ssh_enabled_change)
-        ssh_enabled_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        ssh_enabled_checkbutton.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         # credentials frame
         credentials_frame = tk.Frame(self)
-        credentials_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+        credentials_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         # username
         username_label = tk.Label(credentials_frame, text="Username")
-        username_label.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        username_label.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         self.username_var = tk.StringVar(credentials_frame)
         self.username_var.trace_add("write", self.on_username_change)
         username = tk.Entry(credentials_frame, width=40, textvariable=self.username_var)
-        username.grid(row=0, column=1, padx=0, pady=0, sticky="ne")
+        username.grid(row=0, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
         
         # password
         password_label = tk.Label(credentials_frame, text="Password")
-        password_label.grid(row=1, column=0, sticky="w", padx=0, pady=0)
+        password_label.grid(row=1, column=0, sticky="w", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         self.password_var = tk.StringVar(credentials_frame)
         self.password_var.trace_add("write", self.on_password_change)
         password = tk.Entry(credentials_frame, width=40, textvariable=self.password_var)
-        password.grid(row=1, column=1, padx=0, pady=0, sticky="ne")
+        password.grid(row=1, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
         
         # command
         command_label = tk.Label(credentials_frame, text="Command")
-        command_label.grid(row=2, column=0, sticky="w", padx=0, pady=0)
+        command_label.grid(row=2, column=0, sticky="w", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
         self.command_var = tk.StringVar(credentials_frame)
         self.command_var.trace_add("write", self.on_command_change)
         command = tk.Entry(credentials_frame, width=40, textvariable=self.command_var)
-        command.grid(row=2, column=1, padx=0, pady=0, sticky="ne")
+        command.grid(row=2, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="ne")
     
     def set_ssh_enabled(self, value: bool):
         value = int(value)
@@ -248,7 +251,7 @@ class TimingFrame(tk.LabelFrame):
 
         for idx, (label_text, entry_name, data_type) in enumerate(labels_entries):
             label = tk.Label(self, text=label_text)
-            label.grid(row=idx, column=0, sticky="nw", padx=0, pady=0)
+            label.grid(row=idx, column=0, sticky="nw", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
             
             entry_var = None
             match data_type:
@@ -268,7 +271,7 @@ class TimingFrame(tk.LabelFrame):
 
             setattr(self, f"{entry_name}_var", entry_var)
             entry = tk.Entry(self, textvariable=entry_var)
-            entry.grid(row=idx, column=1, sticky="ne", padx=0, pady=0)
+            entry.grid(row=idx, column=1, sticky="ne", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
             setattr(self, entry_name, entry)
     
     def set_precheck(self, value: float):
@@ -353,11 +356,11 @@ class PsuFrame(tk.LabelFrame):
         # Riga 1: use remote PSU
         self.psu_enabled_var = tk.IntVar(self)
         psu_enabled_checkbutton = tk.Checkbutton(self, text='Use remote PSU',variable=self.psu_enabled_var, command=self.on_psu_enable_change)
-        psu_enabled_checkbutton.grid(row=0, column=0, padx=0, pady=0, sticky="nw")
+        psu_enabled_checkbutton.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         # Riga 0: IP Alimentatore, IP Start e IP End
         psu_ip_label = tk.Label(self, text="IP Alimentatore:")
-        psu_ip_label.grid(row=1, column=0, padx=0, pady=0, sticky="nw")
+        psu_ip_label.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nw")
         
         self.psu_ip_var = tk.StringVar(self)
         self.psu_ip_var.trace_add("write", self.on_psu_ip_change)
@@ -402,22 +405,22 @@ class ManualControlsFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
 
         start_button = tk.Button(self, text="Start", command=self.on_start_button_press)
-        start_button.pack(side="left", padx=0, pady=0)
+        start_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         stop_button = tk.Button(self, text="Stop", command=self.on_stop_button_press)
-        stop_button.pack(side="left", padx=0, pady=0)
+        stop_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         self.pause_button = tk.Button(self, text="Pausa", command=self.on_pause_button_press)
-        self.pause_button.pack(side="left", padx=0, pady=0)
+        self.pause_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         force_on_button = tk.Button(self, text="Forza ON", command=self.on_force_poweron_button_press)
-        force_on_button.pack(side="left", padx=0, pady=0)
+        force_on_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         force_off_button = tk.Button(self, text="Forza OFF", command=self.on_force_poweronff_button_press)
-        force_off_button.pack(side="left", padx=0, pady=0)
+        force_off_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
 
         self.pause_status_label = tk.Label(self, text="Stato: In esecuzione")
-        self.pause_status_label.pack(side="left", padx=0, pady=0)
+        self.pause_status_label.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def set_pause_button_text(self, content: str):
         self.pause_button.configure(text=content)
@@ -471,7 +474,7 @@ class InfoFrame(tk.LabelFrame):
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         
         counters_frame = tk.Frame(self)
-        counters_frame.grid(row=0, column=0, padx=0, pady=0, sticky=sticky)
+        counters_frame.grid(row=0, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky=sticky)
 
         self.cycle_count_label = tk.Label(counters_frame, text="Accensioni eseguite: 0")
         self.cycle_count_label.pack(side="left", padx=5)
@@ -480,7 +483,7 @@ class InfoFrame(tk.LabelFrame):
         self.anomaly_count_label.pack(side="left", padx=5)
         
         times_frame = tk.Frame(self)
-        times_frame.grid(row=1, column=0, padx=0, pady=0, sticky=sticky)
+        times_frame.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky=sticky)
         
         self.elapsed_time_label = tk.Label(times_frame, text="Test non ancora partito.")
         self.elapsed_time_label.pack(side="left", padx=5)
@@ -556,7 +559,7 @@ class FileFrame(tk.LabelFrame):
         self.file.config(height=17)
 
         apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
-        apply_button.grid(row=1, column=0, padx=0, pady=0)
+        apply_button.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def set_apply_button_press_cb(self, cb: Callable[[], None]):
         self.apply_button_press_cb = cb
