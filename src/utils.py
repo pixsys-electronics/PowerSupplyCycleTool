@@ -32,11 +32,10 @@ def get_current_git_commit_hash():
     sha = repo.head.object.hexsha
     return sha
 
-def url_list_from_csv(content: str) -> OrderedSet[str]:
+def parse_data_from_csv(content: str) -> list:
     csv_file = io.StringIO(content)
     csv_reader = csv.DictReader(csv_file, delimiter=';')
-    data = OrderedSet([row['url'] for row in csv_reader])
-    return data
+    return list(csv_reader)
 
 def run_ssh_command(server: IPv4Address, username: str, password: str, command: str) -> tuple:
     ssh = SSHClient()

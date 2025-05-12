@@ -14,7 +14,7 @@ from config import TestBenchConfig
 from gui import FileFrame, InfoFrame, IpTableFrame, LogFrame, LogType, ManualControlsFrame, ModbusFrame, PsuFrame, SSHFrame, TimingFrame
 from enum import Enum
 from dp832 import dp832
-from utils import broadcast_modbus_read_poweron_counter, broadcast_modbus_read_register, broadcast_modbus_write_poweron_counter, broadcast_modbus_write_register, broadcast_modbus_write_time_counter, broadcast_ping, broadcast_ssh_command, get_current_git_commit_hash, ip_from_url, url_list_from_csv
+from utils import broadcast_modbus_read_poweron_counter, broadcast_modbus_read_register, broadcast_modbus_write_poweron_counter, broadcast_modbus_write_register, broadcast_modbus_write_time_counter, broadcast_ping, broadcast_ssh_command, get_current_git_commit_hash, ip_from_url, parse_data_from_csv
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -125,6 +125,7 @@ class TestbenchApp(tk.Tk):
         self.urls: OrderedSet[str] = OrderedSet()
         self.detection_times: dict[str, datetime.datetime] = {}
         self.cycle_defectives: set[str] = set()
+        self.modbus_enabled: dict[str, bool] = {}
         self.t0: datetime.datetime | None = None
         
         # Code per log e comunicazioni verso la GUI
@@ -457,7 +458,9 @@ class TestbenchApp(tk.Tk):
     
     def on_file_apply_press(self):
         text = self.frames.file_frame.get_csv()
-        self.urls = url_list_from_csv(text)
+        data = parse_data_from_csv(text)
+        self.urls = OrderedSet([row['url'] for row in data])
+        self.modbus_enabled = {row['url']: row['modbus_enabled'] == "true" for row in data}
         self.refresh_address_table()
         
         url_list_path = os.path.join(os.getcwd(), self.url_list_filename)
@@ -640,6 +643,7 @@ class TestbenchApp(tk.Tk):
     
     # returns True if the modbus procedure has succesfully finished, otherwise False
     def modbus_check_procedure(self) -> bool:
+        ip_list = [url for url in self.urls if self.modbus_enabled[url]]
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)
@@ -667,6 +671,7 @@ class TestbenchApp(tk.Tk):
         return not cycle_count_failure
 
     def reverse_modbus_check_procedure(self) -> bool:
+        ip_list = [url for url in self.urls if self.modbus_enabled[url]]
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
         futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)

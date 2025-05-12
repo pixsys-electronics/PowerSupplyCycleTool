@@ -585,14 +585,22 @@ class FileFrame(tk.LabelFrame):
         super().__init__(parent, text="File")
         self.grid(row=row, column=col, padx=padx, pady=pady, sticky=sticky)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=15)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=15)
+        self.grid_rowconfigure(2, weight=1)
+        
+        # Fixed header
+        self.header_label = tk.Label(self, text="This is a fixed header", bg="lightgray", anchor='w', justify='left')
+        self.header_label.grid(row=0, column=0, sticky="nsew")
         
         self.file = scrolledtext.ScrolledText(self)
-        self.file.grid(row=0, column=0, sticky="nsew")
-
-        apply_button = ttk.Button(self, text="Apply", command=self.on_apply_button_press)
-        apply_button.grid(row=1, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT)
+        self.file.grid(row=1, column=0, sticky="nsew")
+        
+        buttons_frame = tk.Frame(self)
+        buttons_frame.grid(row=2, column=0, sticky="nsew")
+        
+        apply_button = ttk.Button(buttons_frame, text="Apply", command=self.on_apply_button_press)
+        apply_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def set_apply_button_press_cb(self, cb: Callable[[], None]):
         self.apply_button_press_cb = cb
@@ -604,6 +612,7 @@ class FileFrame(tk.LabelFrame):
     def load_csv(self, text: str):
         header, _, content = text.partition('\n')
         self.header = header
+        self.header_label.configure(text=self.header)
         self.file.insert('1.0', content)
     
     def get_header(self) -> str:
