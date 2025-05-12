@@ -646,6 +646,8 @@ class TestbenchApp(tk.Tk):
         ip_list = [url for url in self.urls if self.modbus_enabled[url]]
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
+        if len(ip_list) == 0:
+            return True
         futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)
         cycle_count_failure = False
         for ip,future in futures_dict.items():
@@ -674,6 +676,8 @@ class TestbenchApp(tk.Tk):
         ip_list = [url for url in self.urls if self.modbus_enabled[url]]
         ip_list = [ip_from_url(url) for url in self.urls]
         ip_list = [ip for ip in ip_list if ip is not None]
+        if len(ip_list) == 0:
+            return True
         futures_dict = broadcast_modbus_read_poweron_counter(ip_list, self.modbus_timeout)
         cycle_count_success = True
         for ip,future in futures_dict.items():
