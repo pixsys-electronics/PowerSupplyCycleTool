@@ -2,3 +2,5 @@
 /**/.venv
 report_*.csv
 reports
+urls.csv
+config.json

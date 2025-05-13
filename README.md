@@ -15,12 +15,19 @@
 - Linux - Debian 12
 
 ## Setup
+The GUI is developed using TKinter (https://docs.python.org/3/library/tkinter.html). It is not a **pip** package, but an **apt** package.
 ```sh
 apt install python3-tk
+# setup the virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
+# install the requirements
 pip install -r requirements.txt
 ```
+
+You also need:
+- *urls.csv* file, which has to stick to the format shown in the **URL file section**. A *urls.csv.example* file is provided inside this repo
+- *config.json* file, which is explained in the **Configuration** section. A *config.json.example* file is provided inside this repo
 
 ## Run
 ```sh
@@ -93,6 +100,6 @@ Note: the tool will try to connect to EVERY device under test using the above pa
 - edit the register value (to write)
 
 ## URL file
-**TestbenchManager** picks the URLs to test from the *urls.csv* file, which is also editable from the GUI. Each line must contain a single URL, expect for the first line which is the header of the CSV file.
-
-Note: DO NOT EDIT THE HEADER (the first line of the file)
+**TestbenchManager** picks the URLs to test from the *urls.csv* file, which is also editable from the GUI. Each line must contain a:
+- URL (*url* column)
+- Flag to enable the modbus (*modbus_enabled* column), so that you can choose which device will be tested during the modbus/reverse modbus procedure.
