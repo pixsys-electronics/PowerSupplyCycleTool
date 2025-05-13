@@ -274,7 +274,6 @@ class TestbenchApp(tk.Tk):
         self.save_config_debounced()
     
     def on_ssh_send_button_press(self):
-        print("ahahah")
         self.ssh_procedure()
     
     def on_psu_enable_change(self, value: bool):
@@ -478,7 +477,6 @@ class TestbenchApp(tk.Tk):
         data_json = json.dumps(data)
         with open(config_path, mode="w", encoding="utf-8") as file:
             file.write(data_json)
-        print("saved")
     
     def save_config_debounced(self):
         self.save_config_debouncer.call()
