@@ -230,6 +230,7 @@ class TestbenchApp(tk.Tk):
         self.frames.ssh_frame.set_username_change_cb(self.on_ssh_username_change)
         self.frames.ssh_frame.set_password_change_cb(self.on_ssh_password_change)
         self.frames.ssh_frame.set_command_change_cb(self.on_ssh_command_change)
+        self.frames.ssh_frame.set_send_button_press_cb(self.on_ssh_send_button_press)
         
         self.frames.modbus_frame.set_modbus_enable(self.config.modbus.automatic_cycle_count_check_enabled)
         self.frames.modbus_frame.set_register_address(self.config.modbus.register_address)
@@ -271,6 +272,10 @@ class TestbenchApp(tk.Tk):
     def on_ssh_command_change(self, value: str):
         self.config.ssh.command = value
         self.save_config_debounced()
+    
+    def on_ssh_send_button_press(self):
+        print("ahahah")
+        self.ssh_procedure()
     
     def on_psu_enable_change(self, value: bool):
         self.config.connection.psu_enabled = value

@@ -143,11 +143,13 @@ class SSHFrame(tk.LabelFrame):
     username_var: tk.StringVar
     password_var: tk.StringVar
     command_var: tk.StringVar
+    send_command_button: tk.Button
     
     username_change_cb: Callable[[str], None] | None = None
     password_change_cb: Callable[[str], None] | None = None
     command_change_cb: Callable[[str], None] | None = None
     ssh_enabled_change_cb: Callable[[bool], None] | None = None
+    send_button_press_cb: Callable[[], None] | None = None
     
     def __init__(self, parent, row, col, padx, pady, sticky): 
         super().__init__(parent, text="SSH")
@@ -155,6 +157,7 @@ class SSHFrame(tk.LabelFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
         
         self.ssh_enabled_var = tk.IntVar(self)
         
@@ -193,6 +196,12 @@ class SSHFrame(tk.LabelFrame):
         self.command_var.trace_add("write", self.on_command_change)
         command = tk.Entry(credentials_frame, textvariable=self.command_var)
         command.grid(row=2, column=1, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="new")
+        
+        # send button
+        buttons_frame = tk.Frame(self)
+        buttons_frame.grid(row=2, column=0, padx=PADX_DEFAULT, pady=PADY_DEFAULT, sticky="nsew")
+        send_command_button = tk.Button(buttons_frame, text="Send", command=self.on_send_button_press)
+        send_command_button.pack(side="left", padx=PADX_DEFAULT, pady=PADY_DEFAULT)
     
     def set_ssh_enabled(self, value: bool):
         value = int(value)
@@ -239,6 +248,13 @@ class SSHFrame(tk.LabelFrame):
         if self.command_change_cb is not None:
             value = self.command_var.get()
             self.command_change_cb(value)
+    
+    def on_send_button_press(self):
+        if self.send_button_press_cb is not None:
+            self.send_button_press_cb()
+    
+    def set_send_button_press_cb(self, cb: Callable[[], None]):
+        self.send_button_press_cb = cb
     
 class TimingFrame(tk.LabelFrame):
     precheck_var: tk.DoubleVar
